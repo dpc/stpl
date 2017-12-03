@@ -3,8 +3,13 @@
 #![feature(unboxed_closures)]
 #![feature(fn_traits)]
 
+extern crate bincode;
+extern crate serde;
+
 use std::{fmt, io};
 use std::fmt::Arguments;
+use std::io::{Read, Write};
+
 
 pub mod html;
 
@@ -114,5 +119,43 @@ where
 {
     fn render(self, r: &mut Renderer) -> io::Result<()> {
         self(r)
+    }
+}
+
+
+fn handle_dynamic_impl<F, A>(f: F) -> io::Result<()>
+where
+    F: FnOnce<A>,
+    A: for<'de> serde::Deserialize<'de>,
+    <F as std::ops::FnOnce<A>>::Output: Render,
+{
+    let mut v = vec![];
+    std::io::stdin().read_to_end(&mut v)?;
+    let arg: A = bincode::deserialize(&v[..])
+        .map_err(|_e| io::Error::new(io::ErrorKind::Other, "Deserialization error"))?;
+    let tpl = f.call_once(arg);
+    v.clear();
+
+    tpl.render(&mut html::Renderer::new(&mut v))?;
+    std::io::stdout().write_all(&v)?;
+    Ok(())
+}
+
+pub fn handle_dynamic<F, A>(key: &str, f: F)
+where
+    F: FnOnce<A>,
+    A: for<'de> serde::Deserialize<'de>,
+    <F as std::ops::FnOnce<A>>::Output: Render,
+{
+    if let Ok(var_key) = std::env::var("RUST_STPL_DYNAMIC_TEMPLATE_KEY") {
+        if var_key.as_str() == key {
+            match handle_dynamic_impl(f) {
+                Ok(_) => std::process::exit(0),
+                Err(e) => {
+                    eprintln!("Dynamic template process failed: {:?}", e);
+                    std::process::exit(67);
+                }
+            }
+        }
     }
 }

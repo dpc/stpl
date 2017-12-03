@@ -57,13 +57,12 @@ pub struct BareTag {
 pub struct Tag {
     tag: CowStr,
     attrs: Vec<(CowStr, CowStr)>,
-    inn: Box<Render>,
 }
 
-pub struct FinalTag {
+pub struct FinalTag<I> {
     tag: CowStr,
     attrs: Vec<(CowStr, CowStr)>,
-    inn: Box<Render>,
+    inn: I,
 }
 
 impl Render for Tag {
@@ -78,7 +77,6 @@ impl Render for Tag {
             r.write_raw_str("\"")?;
         }
         r.write_raw_str(">")?;
-        self.inn.render(r)?;
         r.write_raw_str("</")?;
         r.write_raw_str(&*self.tag)?;
         r.write_raw_str(">")
@@ -96,78 +94,87 @@ impl Render for BareTag {
     }
 }
 
-impl Tag {
-    fn bar(&self) {
-        println!("calling bar");
-    }
+impl<I: Render> Render for FinalTag<I> {
+    fn render(self, r: &mut super::Renderer) -> io::Result<()> {
+        r.write_raw_str("<")?;
+        r.write_raw_str(&*self.tag)?;
+        for (k, v) in self.attrs {
+            r.write_raw_str(" ")?;
+            r.write_str(&*k)?;
+            r.write_raw_str("=\"")?;
+            r.write_str(&*v)?;
+            r.write_raw_str("\"")?;
+        }
 
-    fn attr(self, key: &'static str, val: &'static str) -> Tag {
-        let Tag {
-            tag,
-            mut attrs,
-            inn,
-        } = self;
+        r.write_raw_str(">")?;
+        self.inn.render(r)?;
+        r.write_raw_str("</")?;
+        r.write_raw_str(&*self.tag)?;
+        r.write_raw_str(">")
+    }
+}
+
+impl Tag {
+    pub fn attr(self, key: &'static str, val: &'static str) -> Tag {
+        let Tag { tag, mut attrs } = self;
         attrs.push((CowStr::from(key), CowStr::from(val)));
         Tag {
             tag: tag,
             attrs: attrs,
-            inn: inn,
         }
+    }
+    pub fn class(self, val: &'static str) -> Tag {
+        self.attr("class", val)
     }
 }
 
 impl BareTag {
-    fn attr(&self, key: &'static str, val: &'static str) -> Tag {
+    pub fn attr(&self, key: &'static str, val: &'static str) -> Tag {
         Tag {
             tag: self.tag.into(),
             attrs: vec![(key.into(), CowStr::from(val))],
-            inn: Box::new(()),
         }
+    }
+    pub fn class(self, val: &'static str) -> Tag {
+        self.attr("class", val)
     }
 }
 
 impl<A: Render + 'static> FnOnce<(A,)> for Tag {
-    type Output = Tag;
-    extern "rust-call" fn call_once(mut self, args: (A,)) -> Self::Output {
-        self.inn = Box::new(args.0);
-        self
-    }
-}
-
-impl<A: Render + 'static> FnOnce<(A,)> for BareTag {
-    type Output = FinalTag;
+    type Output = FinalTag<A>;
     extern "rust-call" fn call_once(self, args: (A,)) -> Self::Output {
         FinalTag {
-            tag: self.tag.into(),
-            attrs: vec![],
-            inn: Box::new(args.0),
+            tag: self.tag,
+            attrs: self.attrs,
+            inn: args.0,
         }
     }
 }
 
-const div: BareTag = BareTag { tag: "div" };
-const p: BareTag = BareTag { tag: "p" };
-
-fn template() -> impl Render {
-    div(p);
-}
-
-fn main() {
-    //div.attr("foo", "bar");
-    //div.attr("foo", "bar")(());
-
-    let _ = template();
-    //div("foo, bar");
-}
-
-fn wrap_in_tag(tag: &'static str, inner: impl Render) -> impl Render {
-    move |r: &mut super::Renderer| -> io::Result<()> {
-        r.write_raw_str("<")?;
-        r.write_raw_str(tag)?;
-        r.write_raw_str(">")?;
-        inner.render(r)?;
-        r.write_raw_str("</")?;
-        r.write_raw_str(tag)?;
-        r.write_raw_str(">")
+impl<A: Render + 'static> FnOnce<(A,)> for BareTag {
+    type Output = FinalTag<A>;
+    extern "rust-call" fn call_once(self, args: (A,)) -> Self::Output {
+        FinalTag {
+            tag: self.tag.into(),
+            attrs: vec![],
+            inn: args.0,
+        }
     }
 }
+
+/// Implement a Render function wrapping in a simple tag
+macro_rules! impl_tag {
+    ($t:ident) => {
+        #[allow(non_upper_case_globals)]
+        pub const $t: BareTag = BareTag { tag: stringify!($t) };
+    }
+}
+
+impl_tag!(html);
+impl_tag!(body);
+impl_tag!(h1);
+impl_tag!(li);
+impl_tag!(ul);
+impl_tag!(ol);
+impl_tag!(p);
+impl_tag!(div);

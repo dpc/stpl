@@ -4,3 +4,5 @@ version = "0.1.0"
 authors = ["Dawid Ciężarkiewicz <dpc@dpc.pw>"]
 
 [dependencies]
+serde = "1"
+bincode = "*"
