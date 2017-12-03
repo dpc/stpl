@@ -5,7 +5,7 @@ pub struct Data {
     pub name: String,
 }
 
-pub fn page(data: Data) -> impl Render {
+pub fn page(data: &Data) -> impl Render {
     use stpl::html::*;
     #[cfg_attr(rustfmt, rustfmt_skip)]
     html(

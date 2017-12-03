@@ -140,17 +140,17 @@ where
 }
 
 
-fn handle_dynamic_impl<F, A>(f: F) -> io::Result<()>
+fn handle_dynamic_impl<F, A, R>(f: F) -> io::Result<()>
 where
-    F: FnOnce<(A,)>,
-    A: for<'de> serde::Deserialize<'de>,
-    <F as std::ops::FnOnce<(A,)>>::Output: Render,
+    for<'a> F: FnOnce<(&'a A,), Output = R>,
+    R: Render,
+    for<'de> A: serde::Deserialize<'de>,
 {
     let mut v = vec![];
     std::io::stdin().read_to_end(&mut v)?;
     let arg: A = bincode::deserialize(&v[..])
         .map_err(|_e| io::Error::new(io::ErrorKind::Other, "Deserialization error"))?;
-    let tpl = f.call_once((arg,));
+    let tpl = f.call_once((&arg,));
     v.clear();
 
     tpl.render(&mut html::Renderer::new(&mut v))?;
@@ -158,11 +158,11 @@ where
     Ok(())
 }
 
-pub fn handle_dynamic<F, A>(key: &str, f: F)
+pub fn handle_dynamic<F, A, R>(key: &str, f: F)
 where
-    F: FnOnce<(A,)>,
-    A: for <'de> serde::Deserialize<'de>,
-    <F as std::ops::FnOnce<(A,)>>::Output: Render,
+    for<'a> F: FnOnce<(&'a A,), Output = R>,
+    R: Render,
+    for<'de> A: serde::Deserialize<'de>,
 {
     if let Ok(var_key) = std::env::var("RUST_STPL_DYNAMIC_TEMPLATE_KEY") {
         if var_key.as_str() == key {
@@ -181,7 +181,7 @@ where
 
 pub fn call_dynamic<A>(key: &str, data: A) -> impl Render + 'static
 where
-    A:  serde::Serialize,
+    A: serde::Serialize,
 {
     let encoded: Vec<u8> = bincode::serialize(&data, bincode::Infinite).unwrap();
 
@@ -203,15 +203,15 @@ where
     }
     child.stdin = None;
 
-    move |r : &mut Renderer| {
-        let out = child
-            .wait_with_output()?;
+    move |r: &mut Renderer| {
+        let out = child.wait_with_output()?;
         if out.status.success() {
             r.write_raw(&out.stdout[..])
         } else {
-            Err(io::Error::new(io::ErrorKind::Other, "Dynamic template process failed"))
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Dynamic template process failed",
+            ))
         }
-
     }
-
 }

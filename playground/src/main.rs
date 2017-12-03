@@ -30,10 +30,10 @@ fn main() {
     println!();
     loop {
         println!("Static:");
-        print_template(templates::home::page(data.clone()));
+        print_template(templates::home::page(&data));
         println!("");
         println!("dynamic:");
-        print_template(stpl::call_dynamic("home", data.clone()));
+        print_template(stpl::call_dynamic("home", &data));
         println!("");
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
