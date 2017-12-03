@@ -15,6 +15,8 @@
 
 # stpl
 
+[![Join the chat at https://gitter.im/dpc/stpl](https://badges.gitter.im/dpc/stpl.svg)](https://gitter.im/dpc/stpl?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 stpl - Super template library for Rust
 
 This version of `stpl` is a Proof of Concept. If you like it, or dislike it
