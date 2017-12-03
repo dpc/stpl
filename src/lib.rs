@@ -195,8 +195,8 @@ where
         .spawn()
         .expect("failed to execute child");
 
+    // TODO: Sending could be done in a separate thread too.
     {
-        // limited borrow of stdin
         let stdin = child.stdin.as_mut().expect("failed to get stdin");
         stdin.write_all(&encoded).expect("failed to write to stdin");
         stdin.flush().expect("failed to flush stdin");
