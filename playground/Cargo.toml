@@ -1,0 +1,9 @@
+[package]
+name = "stpl-test"
+version = "0.1.0"
+authors = ["Dawid Ciężarkiewicz <dpc@dpc.pw>"]
+
+[dependencies]
+stpl = { version = "*", path = "../" }
+serde = "1"
+serde_derive = "1"

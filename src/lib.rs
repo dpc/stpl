@@ -1,7 +1,7 @@
 #![feature(universal_impl_trait)]
 #![feature(conservative_impl_trait)]
 
-use std::io;
+use std::{io, fmt};
 use std::fmt::Arguments;
 
 pub mod html;
@@ -23,17 +23,6 @@ pub trait Renderer  {
     }
     fn write_raw_str(&mut self, s: &str) -> io::Result<()> {
         self.write_raw(s.as_bytes())
-    }
-}
-
-impl Renderer for Vec<u8> {
-    fn write_raw(&mut self, data: &[u8]) -> io::Result<()> {
-        use std::io::Write;
-        self.write_all(data)
-    }
-
-    fn write_raw_fmt(&mut self, fmt: Arguments) -> io::Result<()> {
-        self.write_fmt(fmt)
     }
 }
 
@@ -67,19 +56,46 @@ impl Render for usize {
     }
 }
 
+impl<'a> Render for &'a str {
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        r.write_str(self)
+    }
+}
+
+impl<'a> Render for fmt::Arguments<'a> {
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        r.write_fmt(self)
+    }
+}
+
+impl<'a> Render for &'a fmt::Arguments<'a> {
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        r.write_fmt(*self)
+    }
+}
+
+impl<A> Render for (A,) where A : Render {
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        self.0.render(r)
+    }
+}
+
+impl<A, B> Render for (A, B) where A : Render, B: Render {
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        self.0.render(r)
+    }
+}
+
+impl<A, B, C> Render for (A, B, C) where A : Render, B: Render, C: Render {
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        self.0.render(r)
+    }
+}
+
+
 impl<F> Render for F
 where F : FnOnce(&mut Renderer) -> io::Result<()> {
     fn render(self, r: &mut Renderer) -> io::Result<()> {
         self(r)
     }
-}
-
-
-#[test]
-fn t1() {
-
-    let mut v= vec![];
-    render_list(vec!["a", "b"]).render(&mut v).unwrap();
-
-    assert_eq!("", String::from_utf8_lossy(v.as_slice()));
 }
