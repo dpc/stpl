@@ -20,7 +20,8 @@ pub fn print_template(tpl: impl stpl::Render) {
 }
 
 fn main() {
-    stpl::handle_dynamic("home", templates::home::page);
+    stpl::handle_dynamic().
+        html("home", templates::home::page);
 
     let data = templates::home::Data {
         name: "William".into()

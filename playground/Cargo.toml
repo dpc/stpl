@@ -1,5 +1,5 @@
 [package]
-name = "stpl-test"
+name = "stpl-playground"
 version = "0.1.0"
 authors = ["Dawid Ciężarkiewicz <dpc@dpc.pw>"]
 

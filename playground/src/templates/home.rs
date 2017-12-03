@@ -12,7 +12,12 @@ pub fn page(data: &Data) -> impl Render {
         body(
             (
                 h1.class("main")("Welcome page"),
-                p(format!("Hi, {}!", data.name)),
+                p(
+                    format!("Hi, {}!", data.name)
+                ),
+                ul(
+                    (0..5).map(|n| li(n)).collect::<Vec<_>>()
+                )
             )
         )
     )

@@ -1,3 +1,23 @@
+//! stpl - Super template library
+//!
+//!
+//! This version of `stpl` is a Proof of Concept. If you like it, or dislike it
+//! please be vocal about it.
+//!
+//! `stpl` goals:
+//!
+//! * no ugly macros; actually, no macros at all;
+//! * no text-files with weird syntax; Rust only!
+//! * still, nice syntax and support for run-time templates (magic!)
+//!
+//! Nits:
+//!
+//! * uses 4 `nightly` unstable features
+//!
+//! # Help
+//!
+//! Please see `./playground` subdirectory for example usage.
+
 #![feature(universal_impl_trait)]
 #![feature(conservative_impl_trait)]
 #![feature(unboxed_closures)]
@@ -11,8 +31,12 @@ use std::fmt::Arguments;
 use std::io::{Read, Write};
 
 
+/// HTML rendering functions
 pub mod html;
 
+/// Rendering destination
+///
+/// Takes care of escaping and such.
 pub trait Renderer {
     fn write(&mut self, data: &[u8]) -> io::Result<()> {
         self.write_raw(data)
@@ -33,6 +57,16 @@ pub trait Renderer {
     }
 }
 
+/// A type that can be rendered to `Renderer`
+///
+/// This can be generally thought as a `template`, with it's data,
+/// that is ready to render itself into the `Renderer`.
+///
+/// It is defined for bunch of `std` types. Please send PR if
+/// something is missing.
+///
+/// You can impl it for your own types too. You usually compose it
+/// from many other `impl Render` data.
 pub trait Render {
     fn render(self, &mut Renderer) -> io::Result<()>;
 }
@@ -46,12 +80,29 @@ impl<T: Render> Render for Vec<T> {
     }
 }
 
+impl<T: Render> Render for Box<T> {
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        (*self).render(r)?;
+        Ok(())
+    }
+}
+
+
+
 impl Render for () {
     fn render(self, _: &mut Renderer) -> io::Result<()> {
         Ok(())
     }
 }
 
+impl<R: Render> Render for Option<R> {
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        if let Some(s) = self {
+            s.render(r)?
+        }
+        Ok(())
+    }
+}
 impl Render for String {
     fn render(self, r: &mut Renderer) -> io::Result<()> {
         r.write_raw(self.as_bytes())
@@ -81,6 +132,7 @@ impl<'a> Render for &'a fmt::Arguments<'a> {
         r.write_fmt(*self)
     }
 }
+
 
 impl<A> Render for (A,)
 where
@@ -130,12 +182,15 @@ where
     }
 }
 
-impl<F> Render for F
+/// Use to wrap closures with
+pub struct Fn<F>(pub F);
+
+impl<F> Render for Fn<F>
 where
     F: FnOnce(&mut Renderer) -> io::Result<()>,
 {
     fn render(self, r: &mut Renderer) -> io::Result<()> {
-        self(r)
+        self.0(r)
     }
 }
 
@@ -158,20 +213,41 @@ where
     Ok(())
 }
 
-pub fn handle_dynamic<F, A, R>(key: &str, f: F)
-where
-    for<'a> F: FnOnce<(&'a A,), Output = R>,
-    R: Render,
-    for<'de> A: serde::Deserialize<'de>,
-{
-    if let Ok(var_key) = std::env::var("RUST_STPL_DYNAMIC_TEMPLATE_KEY") {
-        if var_key.as_str() == key {
-            match handle_dynamic_impl(f) {
-                Ok(_) => std::process::exit(0),
-                Err(e) => {
-                    eprintln!("Dynamic template process failed: {:?}", e);
-                    std::process::exit(67);
+/// `handle_dynamic` handle
+pub struct HandleDynamic;
+
+pub fn handle_dynamic() -> HandleDynamic {
+    HandleDynamic
+}
+
+impl HandleDynamic {
+    pub fn html<F, A, R>(&self, key: &str, f: F)
+    where
+        for<'a> F: FnOnce<(&'a A,), Output = R>,
+        R: Render,
+        for<'de> A: serde::Deserialize<'de>,
+    {
+        // TODO: optimize, don't fetch every time?
+        if let Ok(var_key) = std::env::var("RUST_STPL_DYNAMIC_TEMPLATE_KEY") {
+            if var_key.as_str() == key {
+                match handle_dynamic_impl(f) {
+                    Ok(_) => std::process::exit(0),
+                    Err(e) => {
+                        eprintln!("Dynamic template process failed: {:?}", e);
+                        std::process::exit(67);
+                    }
                 }
+            }
+        }
+    }
+}
+
+impl std::ops::Drop for HandleDynamic {
+    fn drop(&mut self) {
+        if let Ok(var_key) = std::env::var("RUST_STPL_DYNAMIC_TEMPLATE_KEY") {
+            if !var_key.is_empty() {
+                eprintln!("Couldn't find dynamic template by key: {}", var_key);
+                std::process::exit(68);
             }
         }
     }
@@ -179,7 +255,25 @@ where
 
 
 
-pub fn call_dynamic<A>(key: &str, data: A) -> impl Render + 'static
+/// Call a template dynamically (with ability to update at runtime)
+///
+/// Make sure to put `handle_dynamic` at the very beginning of your
+/// binary if you want to use it.
+///
+/// `data` type must be the same as template expects.
+///
+/// The template will evaluate in another process, so you can't rely
+/// on value of globals, and such, but otherwise it's transparent.
+///
+/// It works by serializing `data` and passing it to a child process.
+/// The child process is the current binary, with environment variable
+/// pointing to the right template. `handle_dynamic` will detect
+/// being a dynamic-template-child, deserialize `data`, render
+/// the template and write the output to `stdout`. This will
+/// be used as a transparent Template.
+///
+/// TODO: This returning `impl Render` doesn't make sense.
+pub fn call_dynamic<A>(key: &str, data: &A) -> impl Render + 'static
 where
     A: serde::Serialize,
 {
@@ -203,7 +297,7 @@ where
     }
     child.stdin = None;
 
-    move |r: &mut Renderer| {
+    Fn(move |r: &mut Renderer| {
         let out = child.wait_with_output()?;
         if out.status.success() {
             r.write_raw(&out.stdout[..])
@@ -213,5 +307,5 @@ where
                 "Dynamic template process failed",
             ))
         }
-    }
+    })
 }

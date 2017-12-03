@@ -126,6 +126,9 @@ impl Tag {
     pub fn class(self, val: &'static str) -> Tag {
         self.attr("class", val)
     }
+    pub fn id(self, val: &'static str) -> Tag {
+        self.attr("id", val)
+    }
 }
 
 impl BareTag {
@@ -137,6 +140,9 @@ impl BareTag {
     }
     pub fn class(self, val: &'static str) -> Tag {
         self.attr("class", val)
+    }
+    pub fn id(self, val: &'static str) -> Tag {
+        self.attr("id", val)
     }
 }
 
@@ -171,10 +177,22 @@ macro_rules! impl_tag {
 }
 
 impl_tag!(html);
+impl_tag!(head);
 impl_tag!(body);
+impl_tag!(div);
+impl_tag!(section);
 impl_tag!(h1);
+impl_tag!(h2);
+impl_tag!(h3);
+impl_tag!(h4);
+impl_tag!(h5);
 impl_tag!(li);
 impl_tag!(ul);
 impl_tag!(ol);
 impl_tag!(p);
-impl_tag!(div);
+impl_tag!(span);
+impl_tag!(b);
+impl_tag!(i);
+impl_tag!(u);
+impl_tag!(string);
+impl_tag!(pre);
