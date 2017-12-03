@@ -15,8 +15,7 @@
 
 # stpl
 
-stpl - Super template library
-
+stpl - Super template library for Rust
 
 This version of `stpl` is a Proof of Concept. If you like it, or dislike it
 please be vocal about it.
