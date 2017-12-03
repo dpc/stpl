@@ -29,7 +29,7 @@ fn main() {
     loop {
         std::thread::sleep(std::time::Duration::from_secs(1));
         println!("Static:");
-        print_template(templates::home::page(&data));
+        print_template(templates::home::page(data.clone()));
         println!("");
         println!("dynamic:");
         //stpl::call_dynamic("home", templates::home::page);

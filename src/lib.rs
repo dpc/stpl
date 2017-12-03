@@ -125,15 +125,15 @@ where
 
 fn handle_dynamic_impl<F, A>(f: F) -> io::Result<()>
 where
-    F: FnOnce<A>,
+    F: FnOnce<(A,)>,
     A: for<'de> serde::Deserialize<'de>,
-    <F as std::ops::FnOnce<A>>::Output: Render,
+    <F as std::ops::FnOnce<(A,)>>::Output: Render,
 {
     let mut v = vec![];
     std::io::stdin().read_to_end(&mut v)?;
     let arg: A = bincode::deserialize(&v[..])
         .map_err(|_e| io::Error::new(io::ErrorKind::Other, "Deserialization error"))?;
-    let tpl = f.call_once(arg);
+    let tpl = f.call_once((arg,));
     v.clear();
 
     tpl.render(&mut html::Renderer::new(&mut v))?;
@@ -143,9 +143,9 @@ where
 
 pub fn handle_dynamic<F, A>(key: &str, f: F)
 where
-    F: FnOnce<A>,
-    A: for<'de> serde::Deserialize<'de>,
-    <F as std::ops::FnOnce<A>>::Output: Render,
+    F: FnOnce<(A,)>,
+    A: for <'de> serde::Deserialize<'de>,
+    <F as std::ops::FnOnce<(A,)>>::Output: Render,
 {
     if let Ok(var_key) = std::env::var("RUST_STPL_DYNAMIC_TEMPLATE_KEY") {
         if var_key.as_str() == key {
