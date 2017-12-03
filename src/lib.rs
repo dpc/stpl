@@ -1,12 +1,14 @@
 #![feature(universal_impl_trait)]
 #![feature(conservative_impl_trait)]
+#![feature(unboxed_closures)]
+#![feature(fn_traits)]
 
-use std::{io, fmt};
+use std::{fmt, io};
 use std::fmt::Arguments;
 
 pub mod html;
 
-pub trait Renderer  {
+pub trait Renderer {
     fn write(&mut self, data: &[u8]) -> io::Result<()> {
         self.write_raw(data)
     }
@@ -26,12 +28,11 @@ pub trait Renderer  {
     }
 }
 
-pub trait Render  {
+pub trait Render {
     fn render(self, &mut Renderer) -> io::Result<()>;
-
 }
 
-impl<T : Render> Render for Vec<T> {
+impl<T: Render> Render for Vec<T> {
     fn render(mut self, r: &mut Renderer) -> io::Result<()> {
         for t in self.drain(..) {
             t.render(r)?;
@@ -41,7 +42,9 @@ impl<T : Render> Render for Vec<T> {
 }
 
 impl Render for () {
-    fn render(self, _: &mut Renderer) -> io::Result<()> { Ok(()) }
+    fn render(self, _: &mut Renderer) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 impl Render for String {
@@ -74,19 +77,31 @@ impl<'a> Render for &'a fmt::Arguments<'a> {
     }
 }
 
-impl<A> Render for (A,) where A : Render {
+impl<A> Render for (A,)
+where
+    A: Render,
+{
     fn render(self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)
     }
 }
 
-impl<A, B> Render for (A, B) where A : Render, B: Render {
+impl<A, B> Render for (A, B)
+where
+    A: Render,
+    B: Render,
+{
     fn render(self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)
     }
 }
 
-impl<A, B, C> Render for (A, B, C) where A : Render, B: Render, C: Render {
+impl<A, B, C> Render for (A, B, C)
+where
+    A: Render,
+    B: Render,
+    C: Render,
+{
     fn render(self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)
     }
@@ -94,7 +109,9 @@ impl<A, B, C> Render for (A, B, C) where A : Render, B: Render, C: Render {
 
 
 impl<F> Render for F
-where F : FnOnce(&mut Renderer) -> io::Result<()> {
+where
+    F: FnOnce(&mut Renderer) -> io::Result<()>,
+{
     fn render(self, r: &mut Renderer) -> io::Result<()> {
         self(r)
     }
