@@ -11,6 +11,7 @@ homepage = "https://github.com/dpc/stpl"
 repository = "https://github.com/dpc/stpl"
 readme = "README.md"
 
+[workspace]
 
 [dependencies]
 serde = "1"
