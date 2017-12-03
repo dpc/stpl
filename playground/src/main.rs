@@ -26,14 +26,16 @@ fn main() {
         name: "William".into()
     };
 
+    println!("Change `src/templates/home.rs` and rerun `cargo build` to pick a new template version");
+    println!();
     loop {
-        std::thread::sleep(std::time::Duration::from_secs(1));
         println!("Static:");
         print_template(templates::home::page(data.clone()));
         println!("");
         println!("dynamic:");
-        //stpl::call_dynamic("home", templates::home::page);
+        print_template(stpl::call_dynamic("home", data.clone()));
         println!("");
+        std::thread::sleep(std::time::Duration::from_secs(5));
     }
 
 }

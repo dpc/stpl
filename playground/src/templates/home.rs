@@ -7,9 +7,13 @@ pub struct Data {
 
 pub fn page(data: Data) -> impl Render {
     use stpl::html::*;
-    html(body((
-        h1.class("main")("Welcome!"),
-        p(format!("Hi, {}", data.name)),
-    )))
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    html(
+        body(
+            (
+                h1.class("main")("Welcome page"),
+                p(format!("Hi, {}!", data.name)),
+            )
+        )
+    )
 }
-

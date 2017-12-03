@@ -97,7 +97,8 @@ where
     B: Render,
 {
     fn render(self, r: &mut Renderer) -> io::Result<()> {
-        self.0.render(r)
+        self.0.render(r)?;
+        self.1.render(r)
     }
 }
 
@@ -108,10 +109,26 @@ where
     C: Render,
 {
     fn render(self, r: &mut Renderer) -> io::Result<()> {
-        self.0.render(r)
+        self.0.render(r)?;
+        self.1.render(r)?;
+        self.2.render(r)
     }
 }
 
+impl<A, B, C, D> Render for (A, B, C, D)
+where
+    A: Render,
+    B: Render,
+    C: Render,
+    D: Render,
+{
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        self.0.render(r)?;
+        self.1.render(r)?;
+        self.2.render(r)?;
+        self.3.render(r)
+    }
+}
 
 impl<F> Render for F
 where
@@ -158,4 +175,43 @@ where
             }
         }
     }
+}
+
+
+
+pub fn call_dynamic<A>(key: &str, data: A) -> impl Render + 'static
+where
+    A:  serde::Serialize,
+{
+    let encoded: Vec<u8> = bincode::serialize(&data, bincode::Infinite).unwrap();
+
+    use std::process::{Command, Stdio};
+    use std::io::Write;
+
+    let mut child = Command::new(std::env::args_os().next().unwrap())
+        .env("RUST_STPL_DYNAMIC_TEMPLATE_KEY", key)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("failed to execute child");
+
+    {
+        // limited borrow of stdin
+        let stdin = child.stdin.as_mut().expect("failed to get stdin");
+        stdin.write_all(&encoded).expect("failed to write to stdin");
+        stdin.flush().expect("failed to flush stdin");
+    }
+    child.stdin = None;
+
+    move |r : &mut Renderer| {
+        let out = child
+            .wait_with_output()?;
+        if out.status.success() {
+            r.write_raw(&out.stdout[..])
+        } else {
+            Err(io::Error::new(io::ErrorKind::Other, "Dynamic template process failed"))
+        }
+
+    }
+
 }
