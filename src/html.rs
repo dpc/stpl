@@ -72,9 +72,9 @@ impl Render for Tag {
         r.write_raw_str(&*self.tag)?;
         for (k, v) in self.attrs {
             r.write_raw_str(" ")?;
-            r.write_str(&*k)?;
+            r.write_raw_str(&*k)?;
             r.write_raw_str("=\"")?;
-            r.write_str(&*v)?;
+            r.write_raw_str(&*v)?;
             r.write_raw_str("\"")?;
         }
         r.write_raw_str(">")?;
@@ -101,9 +101,9 @@ impl<I: Render> Render for FinalTag<I> {
         r.write_raw_str(&*self.tag)?;
         for (k, v) in self.attrs {
             r.write_raw_str(" ")?;
-            r.write_str(&*k)?;
+            r.write_raw_str(&*k)?;
             r.write_raw_str("=\"")?;
-            r.write_str(&*v)?;
+            r.write_raw_str(&*v)?;
             r.write_raw_str("\"")?;
         }
 
@@ -137,6 +137,28 @@ macro_rules! impl_attr_all {
         impl_attr!(integrity);
         impl_attr!(crossorigin);
         impl_attr!(role);
+
+        pub fn data_toggle(self, val: &'static str) -> Tag {
+            self.attr("data-toggle", val)
+        }
+        pub fn data_target(self, val: &'static str) -> Tag {
+            self.attr("data-target", val)
+        }
+        pub fn aria_controls(self, val: &'static str) -> Tag {
+            self.attr("aria-controls", val)
+        }
+        pub fn aria_expanded(self, val: &'static str) -> Tag {
+            self.attr("aria-expanded", val)
+        }
+        pub fn aria_label(self, val: &'static str) -> Tag {
+            self.attr("aria-label", val)
+        }
+        pub fn aria_haspopup(self, val: &'static str) -> Tag {
+            self.attr("aria-haspopup", val)
+        }
+        pub fn aria_labeledby(self, val: &'static str) -> Tag {
+            self.attr("aria-labeledby", val)
+        }
     )
 }
 
@@ -227,3 +249,6 @@ impl_tag!(link);
 impl_tag!(script);
 impl_tag!(main);
 impl_tag!(nav);
+impl_tag!(a);
+impl_tag!(button);
+impl_tag!(input);
