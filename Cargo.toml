@@ -17,3 +17,4 @@ members = [ "playground" ]
 [dependencies]
 serde = "1"
 bincode = "0.9"
+failure = "0.1"

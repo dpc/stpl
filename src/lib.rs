@@ -23,12 +23,14 @@
 #![feature(fn_traits)]
 
 extern crate bincode;
+#[macro_use]
+extern crate failure;
 extern crate serde;
 
 use std::{fmt, io};
 use std::fmt::Arguments;
 use std::io::{Read, Write};
-
+use std::path::Path;
 
 /// HTML rendering functions
 pub mod html;
@@ -299,21 +301,37 @@ pub fn handle_dynamic() -> HandleDynamic {
     HandleDynamic
 }
 
+/// Exit code used by the dynamic template binary on success
+///
+/// This code is non-zero to make it different from typical
+/// success exit code of an unsuspecting binary
+pub const EXIT_CODE_SUCCESS : i32 = 66;
+
+/// Exit code used by the dynamic template binary on failure
+///
+/// The stderr of the process will contain more information.
+pub const EXIT_CODE_FAILED: i32 = 67;
+
+/// Exit code used by the deyamic template binary when template key was not found
+pub const EXIT_CODE_NOT_FOUND: i32 = 68;
+
+const ENV_NAME : &'static str = "RUST_STPL_DYNAMIC_TEMPLATE_NAME";
+
 impl HandleDynamic {
-    pub fn html<F, A, R>(&self, key: &str, f: F)
+    pub fn html<F, A, R>(&self, name: &str, f: F)
     where
         for<'a> F: FnOnce<(&'a A,), Output = R>,
         R: Render,
         for<'de> A: serde::Deserialize<'de>,
     {
         // TODO: optimize, don't fetch every time?
-        if let Ok(var_key) = std::env::var("RUST_STPL_DYNAMIC_TEMPLATE_KEY") {
-            if var_key.as_str() == key {
+        if let Ok(var_name) = std::env::var(ENV_NAME) {
+            if var_name.as_str() == name {
                 match handle_dynamic_impl(f) {
-                    Ok(_) => std::process::exit(0),
+                    Ok(_) => std::process::exit(EXIT_CODE_SUCCESS),
                     Err(e) => {
                         eprintln!("Dynamic template process failed: {:?}", e);
-                        std::process::exit(67);
+                        std::process::exit(EXIT_CODE_FAILED);
                     }
                 }
             }
@@ -323,21 +341,44 @@ impl HandleDynamic {
 
 impl std::ops::Drop for HandleDynamic {
     fn drop(&mut self) {
-        if let Ok(var_key) = std::env::var("RUST_STPL_DYNAMIC_TEMPLATE_KEY") {
+        if let Ok(var_key) = std::env::var(ENV_NAME) {
             if !var_key.is_empty() {
                 eprintln!("Couldn't find dynamic template by key: {}", var_key);
-                std::process::exit(68);
+                std::process::exit(EXIT_CODE_NOT_FOUND);
             }
         }
     }
 }
 
+#[derive(Fail, Debug)]
+pub enum DynamicError {
+    #[fail(display = "IO error")] Io(#[cause] io::Error),
+    #[fail(display = "Template not found: {}", name)]
+    NotFound {
+        name: String,
+    },
+    #[fail(display = "Template failed")]
+    Failed {
+        exit_code: Option<i32>,
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    }
+}
+
+impl From<io::Error> for DynamicError {
+    fn from(e: io::Error) -> Self {
+        DynamicError::Io(e)
+    }
+}
+
+type DynamicResult<T> = std::result::Result<T, DynamicError>;
+
 
 
 /// Call a template dynamically (with ability to update at runtime)
 ///
-/// Make sure to put `handle_dynamic` at the very beginning of your
-/// binary if you want to use it.
+/// Make sure to put `handle_dynamic` at the very beginning of the code
+/// of program under `path`.
 ///
 /// `data` type must be the same as template expects.
 ///
@@ -350,9 +391,11 @@ impl std::ops::Drop for HandleDynamic {
 /// being a dynamic-template-child, deserialize `data`, render
 /// the template and write the output to `stdout`. This will
 /// be used as a transparent Template.
-///
-/// TODO: This returning `impl Render` doesn't make sense.
-pub fn call_dynamic<A>(key: &str, data: &A) -> impl Render + 'static
+pub fn call_dynamic<'a, 'path, A: 'static>(
+    path: &'path Path,
+    name: &'a str,
+    data: &'a A,
+) -> DynamicResult<Vec<u8>>
 where
     A: serde::Serialize,
 {
@@ -361,14 +404,16 @@ where
     use std::process::{Command, Stdio};
     use std::io::Write;
 
-    let mut child = Command::new(std::env::args_os().next().unwrap())
-        .env("RUST_STPL_DYNAMIC_TEMPLATE_KEY", key)
+    let mut child = Command::new(path)
+        .env(ENV_NAME, name)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .expect("failed to execute child");
 
-    // TODO: Sending could be done in a separate thread too.
+    // TODO: Sending and receiving could be done in a separate thread too, and
+    // some form of a "future" could be used
     {
         let stdin = child.stdin.as_mut().expect("failed to get stdin");
         stdin.write_all(&encoded).expect("failed to write to stdin");
@@ -376,15 +421,31 @@ where
     }
     child.stdin = None;
 
-    Fn(move |r: &mut Renderer| {
-        let out = child.wait_with_output()?;
-        if out.status.success() {
-            r.write_raw(&out.stdout[..])
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Dynamic template process failed",
-            ))
-        }
-    })
+    let out = child.wait_with_output()?;
+    match out.status.code() {
+        Some(EXIT_CODE_SUCCESS) => Ok(out.stdout),
+        Some(EXIT_CODE_NOT_FOUND) => Err(DynamicError::NotFound {
+            name: name.to_owned(),
+        }),
+        code => Err(DynamicError::Failed {
+            exit_code: code,
+            stdout: out.stdout,
+            stderr: out.stderr,
+        })
+    }
+}
+
+/// Call current binary file to handle the template
+///
+/// Make sure to put `handle_dynamic` at the very beginning of your
+/// binary if you want to use it.
+///
+/// See `call_dynamic` for more info.
+pub fn call_dynamic_self<A: 'static>(name: &str, data: &A) -> DynamicResult<Vec<u8>>
+where
+    A: serde::Serialize,
+{
+    let path = std::env::args_os().next().unwrap();
+    let path = path.as_ref();
+    call_dynamic(path, name, data)
 }

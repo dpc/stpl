@@ -118,7 +118,7 @@ impl<I: Render> Render for FinalTag<I> {
 
 macro_rules! impl_attr {
     ($t:ident) => {
-        pub fn $t(self, val: &'static str) -> Tag {
+        pub fn $t<V : Into<CowStr>>(self, val: V) -> Tag {
             self.attr(stringify!($t), val)
         }
     }
@@ -137,8 +137,12 @@ macro_rules! impl_attr_all {
         impl_attr!(integrity);
         impl_attr!(crossorigin);
         impl_attr!(role);
+        impl_attr!(method);
+        impl_attr!(action);
+        impl_attr!(placeholder);
+        impl_attr!(value);
 
-        pub fn data_toggle(self, val: &'static str) -> Tag {
+        pub fn data_toggle<V : Into<CowStr>>(self, val: V) -> Tag {
             self.attr("data-toggle", val)
         }
         pub fn data_target(self, val: &'static str) -> Tag {
@@ -163,9 +167,9 @@ macro_rules! impl_attr_all {
 }
 
 impl Tag {
-    pub fn attr(self, key: &'static str, val: &'static str) -> Tag {
+    pub fn attr<K: Into<CowStr>, V: Into<CowStr>>(self, key: K, val: V) -> Tag {
         let Tag { tag, mut attrs } = self;
-        attrs.push((CowStr::from(key), CowStr::from(val)));
+        attrs.push((key.into(), val.into()));
         Tag {
             tag: tag,
             attrs: attrs,
@@ -176,10 +180,10 @@ impl Tag {
 }
 
 impl BareTag {
-    pub fn attr(&self, key: &'static str, val: &'static str) -> Tag {
+    pub fn attr<K: Into<CowStr>, V: Into<CowStr>>(self, key: K, val: V) -> Tag {
         Tag {
             tag: self.tag.into(),
-            attrs: vec![(key.into(), CowStr::from(val))],
+            attrs: vec![(key.into(), val.into())],
         }
     }
     impl_attr_all!();
@@ -250,5 +254,6 @@ impl_tag!(script);
 impl_tag!(main);
 impl_tag!(nav);
 impl_tag!(a);
+impl_tag!(form);
 impl_tag!(button);
 impl_tag!(input);

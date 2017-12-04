@@ -38,7 +38,7 @@ fn main() {
         print_template(templates::home::page(&data));
         println!("");
         println!("dynamic:");
-        print_template(stpl::call_dynamic("home", &data));
+        std::io::stdout().write_all(&stpl::call_dynamic_self("home", &data).unwrap()).unwrap();
         println!("");
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
