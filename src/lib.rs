@@ -180,6 +180,86 @@ where
         self.3.render(r)
     }
 }
+impl<A, B, C, D, E> Render for (A, B, C, D, E)
+where
+    A: Render,
+    B: Render,
+    C: Render,
+    D: Render,
+    E: Render,
+{
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        self.0.render(r)?;
+        self.1.render(r)?;
+        self.2.render(r)?;
+        self.3.render(r)?;
+        self.4.render(r)
+    }
+}
+
+impl<A, B, C, D, E, F> Render for (A, B, C, D, E, F)
+where
+    A: Render,
+    B: Render,
+    C: Render,
+    D: Render,
+    E: Render,
+    F: Render,
+{
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        self.0.render(r)?;
+        self.1.render(r)?;
+        self.2.render(r)?;
+        self.3.render(r)?;
+        self.4.render(r)?;
+        self.5.render(r)
+    }
+}
+
+impl<A, B, C, D, E, F, G> Render for (A, B, C, D, E, F, G)
+where
+    A: Render,
+    B: Render,
+    C: Render,
+    D: Render,
+    E: Render,
+    F: Render,
+    G: Render,
+{
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        self.0.render(r)?;
+        self.1.render(r)?;
+        self.2.render(r)?;
+        self.3.render(r)?;
+        self.4.render(r)?;
+        self.5.render(r)?;
+        self.6.render(r)
+    }
+}
+
+impl<A, B, C, D, E, F, G, H> Render for (A, B, C, D, E, F, G, H)
+where
+    A: Render,
+    B: Render,
+    C: Render,
+    D: Render,
+    E: Render,
+    F: Render,
+    G: Render,
+    H: Render,
+{
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        self.0.render(r)?;
+        self.1.render(r)?;
+        self.2.render(r)?;
+        self.3.render(r)?;
+        self.4.render(r)?;
+        self.5.render(r)?;
+        self.6.render(r)?;
+        self.7.render(r)?;
+        Ok(())
+    }
+}
 
 /// Use to wrap closures with
 pub struct Fn<F>(pub F);

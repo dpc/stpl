@@ -3,6 +3,7 @@ use std::fmt;
 use std::borrow::Cow;
 
 use Render;
+use super::Fn;
 
 pub struct Renderer<T> {
     io: T,
@@ -114,6 +115,31 @@ impl<I: Render> Render for FinalTag<I> {
     }
 }
 
+
+macro_rules! impl_attr {
+    ($t:ident) => {
+        pub fn $t(self, val: &'static str) -> Tag {
+            self.attr(stringify!($t), val)
+        }
+    }
+}
+
+macro_rules! impl_attr_all {
+    () => (
+        impl_attr!(class);
+        impl_attr!(id);
+        impl_attr!(charset);
+        impl_attr!(content);
+        impl_attr!(name);
+        impl_attr!(href);
+        impl_attr!(rel);
+        impl_attr!(src);
+        impl_attr!(integrity);
+        impl_attr!(crossorigin);
+        impl_attr!(role);
+    )
+}
+
 impl Tag {
     pub fn attr(self, key: &'static str, val: &'static str) -> Tag {
         let Tag { tag, mut attrs } = self;
@@ -123,12 +149,8 @@ impl Tag {
             attrs: attrs,
         }
     }
-    pub fn class(self, val: &'static str) -> Tag {
-        self.attr("class", val)
-    }
-    pub fn id(self, val: &'static str) -> Tag {
-        self.attr("id", val)
-    }
+
+    impl_attr_all!();
 }
 
 impl BareTag {
@@ -138,12 +160,7 @@ impl BareTag {
             attrs: vec![(key.into(), CowStr::from(val))],
         }
     }
-    pub fn class(self, val: &'static str) -> Tag {
-        self.attr("class", val)
-    }
-    pub fn id(self, val: &'static str) -> Tag {
-        self.attr("id", val)
-    }
+    impl_attr_all!();
 }
 
 impl<A: Render + 'static> FnOnce<(A,)> for Tag {
@@ -176,8 +193,17 @@ macro_rules! impl_tag {
     }
 }
 
+pub fn doctype(t: &'static str) -> impl Render {
+    Fn(move |r: &mut super::Renderer| {
+        r.write_raw(b"<!DOCTYPE ")?;
+        r.write_raw_str(t)?;
+        r.write_raw(b">")
+    })
+}
+
 impl_tag!(html);
 impl_tag!(head);
+impl_tag!(meta);
 impl_tag!(title);
 impl_tag!(body);
 impl_tag!(div);
@@ -197,3 +223,7 @@ impl_tag!(i);
 impl_tag!(u);
 impl_tag!(string);
 impl_tag!(pre);
+impl_tag!(link);
+impl_tag!(script);
+impl_tag!(main);
+impl_tag!(nav);
