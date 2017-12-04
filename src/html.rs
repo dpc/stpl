@@ -178,6 +178,7 @@ macro_rules! impl_tag {
 
 impl_tag!(html);
 impl_tag!(head);
+impl_tag!(title);
 impl_tag!(body);
 impl_tag!(div);
 impl_tag!(section);

@@ -10,6 +10,7 @@ use std::io::Write;
 use stpl::Render;
 
 pub mod templates;
+use templates::*;
 
 pub fn print_template(tpl: impl stpl::Render) {
     let mut v = vec![];
@@ -24,6 +25,9 @@ fn main() {
         html("home", templates::home::page);
 
     let data = templates::home::Data {
+        page: base::Data {
+            title: "Hello!".into(),
+        },
         name: "William".into()
     };
 

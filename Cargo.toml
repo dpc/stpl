@@ -12,6 +12,7 @@ repository = "https://github.com/dpc/stpl"
 readme = "README.md"
 
 [workspace]
+members = [ "playground" ]
 
 [dependencies]
 serde = "1"
