@@ -42,7 +42,7 @@ pub trait Renderer {
     fn write(&mut self, data: &[u8]) -> io::Result<()> {
         self.write_raw(data)
     }
-    fn write_fmt(&mut self, fmt: Arguments) -> io::Result<()> {
+    fn write_fmt(&mut self, fmt: &Arguments) -> io::Result<()> {
         self.write(format!("{}", fmt).as_bytes())
     }
     fn write_str(&mut self, s: &str) -> io::Result<()> {
@@ -50,7 +50,7 @@ pub trait Renderer {
     }
     fn write_raw(&mut self, data: &[u8]) -> io::Result<()>;
 
-    fn write_raw_fmt(&mut self, fmt: Arguments) -> io::Result<()> {
+    fn write_raw_fmt(&mut self, fmt: &Arguments) -> io::Result<()> {
         self.write_raw(format!("{}", fmt).as_bytes())
     }
     fn write_raw_str(&mut self, s: &str) -> io::Result<()> {
@@ -58,13 +58,13 @@ pub trait Renderer {
     }
 }
 
-pub struct RawRenderer<'a, T: 'a>(&'a mut T);
+pub struct RawRenderer<'a, T: 'a + ?Sized>(&'a mut T);
 
-impl<'a, T: 'a + Renderer> Renderer for RawRenderer<'a, T> {
+impl<'a, T: 'a + Renderer + ?Sized> Renderer for RawRenderer<'a, T> {
     fn write(&mut self, data: &[u8]) -> io::Result<()> {
         self.0.write_raw(data)
     }
-    fn write_fmt(&mut self, fmt: Arguments) -> io::Result<()> {
+    fn write_fmt(&mut self, fmt: &Arguments) -> io::Result<()> {
         self.0.write_raw_fmt(fmt)
     }
     fn write_str(&mut self, s: &str) -> io::Result<()> {
@@ -74,7 +74,7 @@ impl<'a, T: 'a + Renderer> Renderer for RawRenderer<'a, T> {
         self.0.write_raw(data)
     }
 
-    fn write_raw_fmt(&mut self, fmt: Arguments) -> io::Result<()> {
+    fn write_raw_fmt(&mut self, fmt: &Arguments) -> io::Result<()> {
         self.0.write_raw_fmt(fmt)
     }
     fn write_raw_str(&mut self, s: &str) -> io::Result<()> {
@@ -93,28 +93,28 @@ impl<'a, T: 'a + Renderer> Renderer for RawRenderer<'a, T> {
 /// You can impl it for your own types too. You usually compose it
 /// from many other `impl Render` data.
 pub trait Render {
-    fn render(self, &mut Renderer) -> io::Result<()>;
+    fn render(&self, &mut Renderer) -> io::Result<()>;
 }
 
 impl<T: Render> Render for Vec<T> {
-    fn render(mut self, r: &mut Renderer) -> io::Result<()> {
-        for t in self.drain(..) {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
+        for t in self.iter() {
             t.render(r)?;
         }
         Ok(())
     }
 }
 
-impl<'a, T: Render + Clone> Render for &'a mut T {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
-        self.clone().render(r)?;
+impl<'a, T: Render + ?Sized> Render for &'a mut T {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
+        (**self).render(r)?;
         Ok(())
     }
 }
 
-impl<T: Render> Render for Box<T> {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
-        (*self).render(r)?;
+impl<T: Render + ?Sized> Render for Box<T> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
+        (**self).render(r)?;
         Ok(())
     }
 }
@@ -122,46 +122,46 @@ impl<T: Render> Render for Box<T> {
 
 
 impl Render for () {
-    fn render(self, _: &mut Renderer) -> io::Result<()> {
+    fn render(&self, _: &mut Renderer) -> io::Result<()> {
         Ok(())
     }
 }
 
 impl<R: Render> Render for Option<R> {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
-        if let Some(s) = self {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
+        if let &Some(ref s) = self {
             s.render(r)?
         }
         Ok(())
     }
 }
 impl Render for String {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         r.write_raw(self.as_bytes())
     }
 }
 
 impl Render for usize {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
-        r.write_raw_fmt(format_args!("{}", self))
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
+        r.write_raw_fmt(&format_args!("{}", self))
     }
 }
 
 impl<'a> Render for &'a str {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         r.write_str(self)
     }
 }
 
 impl<'a> Render for fmt::Arguments<'a> {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         r.write_fmt(self)
     }
 }
 
 impl<'a> Render for &'a fmt::Arguments<'a> {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
-        r.write_fmt(*self)
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
+        r.write_fmt(self)
     }
 }
 
@@ -170,7 +170,7 @@ impl<A> Render for (A,)
 where
     A: Render,
 {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)
     }
 }
@@ -180,7 +180,7 @@ where
     A: Render,
     B: Render,
 {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)?;
         self.1.render(r)
     }
@@ -192,7 +192,7 @@ where
     B: Render,
     C: Render,
 {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)?;
         self.1.render(r)?;
         self.2.render(r)
@@ -206,7 +206,7 @@ where
     C: Render,
     D: Render,
 {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)?;
         self.1.render(r)?;
         self.2.render(r)?;
@@ -221,7 +221,7 @@ where
     D: Render,
     E: Render,
 {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)?;
         self.1.render(r)?;
         self.2.render(r)?;
@@ -239,7 +239,7 @@ where
     E: Render,
     F: Render,
 {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)?;
         self.1.render(r)?;
         self.2.render(r)?;
@@ -259,7 +259,7 @@ where
     F: Render,
     G: Render,
 {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)?;
         self.1.render(r)?;
         self.2.render(r)?;
@@ -281,7 +281,7 @@ where
     G: Render,
     H: Render,
 {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         self.0.render(r)?;
         self.1.render(r)?;
         self.2.render(r)?;
@@ -299,9 +299,9 @@ pub struct Fn<F>(pub F);
 
 impl<F> Render for Fn<F>
 where
-    F: FnOnce(&mut Renderer) -> io::Result<()>,
+    F: std::ops::Fn(&mut Renderer) -> io::Result<()>,
 {
-    fn render(self, r: &mut Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
         self.0(r)
     }
 }

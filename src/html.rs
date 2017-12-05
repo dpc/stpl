@@ -21,8 +21,8 @@ impl<T: io::Write> super::Renderer for Renderer<T> {
         self.io.write_all(data)
     }
 
-    fn write_raw_fmt(&mut self, fmt: fmt::Arguments) -> io::Result<()> {
-        self.io.write_fmt(fmt)
+    fn write_raw_fmt(&mut self, fmt: &fmt::Arguments) -> io::Result<()> {
+        self.io.write_fmt(*fmt)
     }
 
     fn write(&mut self, data: &[u8]) -> io::Result<()> {
@@ -67,10 +67,10 @@ pub struct FinalTag<I> {
 }
 
 impl Render for Tag {
-    fn render(self, r: &mut super::Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut super::Renderer) -> io::Result<()> {
         r.write_raw_str("<")?;
         r.write_raw_str(&*self.tag)?;
-        for (k, v) in self.attrs {
+        for &(ref k, ref v) in self.attrs.iter() {
             r.write_raw_str(" ")?;
             r.write_raw_str(&*k)?;
             r.write_raw_str("=\"")?;
@@ -85,7 +85,7 @@ impl Render for Tag {
 }
 
 impl Render for BareTag {
-    fn render(self, r: &mut super::Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut super::Renderer) -> io::Result<()> {
         r.write_raw_str("<")?;
         r.write_raw_str(&*self.tag)?;
         r.write_raw_str(">")?;
@@ -96,10 +96,10 @@ impl Render for BareTag {
 }
 
 impl<I: Render> Render for FinalTag<I> {
-    fn render(self, r: &mut super::Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut super::Renderer) -> io::Result<()> {
         r.write_raw_str("<")?;
         r.write_raw_str(&*self.tag)?;
-        for (k, v) in self.attrs {
+        for &(ref k, ref v) in self.attrs.iter() {
             r.write_raw_str(" ")?;
             r.write_raw_str(&*k)?;
             r.write_raw_str("=\"")?;
@@ -141,7 +141,11 @@ macro_rules! impl_attr_all {
         impl_attr!(action);
         impl_attr!(placeholder);
         impl_attr!(value);
+        impl_attr!(alt);
 
+        pub fn type_<V : Into<CowStr>>(self, val: V) -> Tag {
+            self.attr("type", val)
+        }
         pub fn data_toggle<V : Into<CowStr>>(self, val: V) -> Tag {
             self.attr("data-toggle", val)
         }
@@ -233,13 +237,13 @@ pub struct Nbsp;
 pub const nbsp: Nbsp = Nbsp;
 
 impl Render for Nbsp {
-    fn render(self, r: &mut super::Renderer) -> io::Result<()> {
+    fn render(&self, r: &mut super::Renderer) -> io::Result<()> {
         r.write_raw(b"&nbsp;")
     }
 }
 
-pub fn raw<'a, T: 'a + super::Renderer>(r: &'a mut T) -> super::RawRenderer<'a, T> {
-    super::RawRenderer(r)
+pub fn raw<T: Render>(x: T) -> impl Render {
+    Fn(move |r: &mut super::Renderer| x.render(&mut super::RawRenderer(r)))
 }
 
 impl_tag!(html);
