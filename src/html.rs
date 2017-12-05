@@ -164,8 +164,8 @@ macro_rules! impl_attr_all {
         pub fn aria_haspopup(self, val: &'static str) -> Tag {
             self.attr("aria-haspopup", val)
         }
-        pub fn aria_labeledby(self, val: &'static str) -> Tag {
-            self.attr("aria-labeledby", val)
+        pub fn aria_labelledby(self, val: &'static str) -> Tag {
+            self.attr("aria-labelledby", val)
         }
     )
 }
@@ -231,6 +231,7 @@ pub fn doctype(t: &'static str) -> impl Render {
     })
 }
 
+#[derive(Copy, Clone)]
 pub struct Nbsp;
 
 #[allow(non_upper_case_globals)]
@@ -238,7 +239,7 @@ pub const nbsp: Nbsp = Nbsp;
 
 impl Render for Nbsp {
     fn render(&self, r: &mut super::Renderer) -> io::Result<()> {
-        r.write_raw(b"&nbsp;")
+        r.write_raw_str("&nbsp;")
     }
 }
 

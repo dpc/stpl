@@ -73,7 +73,6 @@ impl<'a, T: 'a + Renderer + ?Sized> Renderer for RawRenderer<'a, T> {
     fn write_raw(&mut self, data: &[u8]) -> io::Result<()> {
         self.0.write_raw(data)
     }
-
     fn write_raw_fmt(&mut self, fmt: &Arguments) -> io::Result<()> {
         self.0.write_raw_fmt(fmt)
     }
