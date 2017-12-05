@@ -58,6 +58,30 @@ pub trait Renderer {
     }
 }
 
+pub struct RawRenderer<'a, T: 'a>(&'a mut T);
+
+impl<'a, T: 'a + Renderer> Renderer for RawRenderer<'a, T> {
+    fn write(&mut self, data: &[u8]) -> io::Result<()> {
+        self.0.write_raw(data)
+    }
+    fn write_fmt(&mut self, fmt: Arguments) -> io::Result<()> {
+        self.0.write_raw_fmt(fmt)
+    }
+    fn write_str(&mut self, s: &str) -> io::Result<()> {
+        self.0.write_raw_str(s)
+    }
+    fn write_raw(&mut self, data: &[u8]) -> io::Result<()> {
+        self.0.write_raw(data)
+    }
+
+    fn write_raw_fmt(&mut self, fmt: Arguments) -> io::Result<()> {
+        self.0.write_raw_fmt(fmt)
+    }
+    fn write_raw_str(&mut self, s: &str) -> io::Result<()> {
+        self.0.write_raw_str(s)
+    }
+}
+
 /// A type that can be rendered to `Renderer`
 ///
 /// This can be generally thought as a `template`, with it's data,
@@ -77,6 +101,13 @@ impl<T: Render> Render for Vec<T> {
         for t in self.drain(..) {
             t.render(r)?;
         }
+        Ok(())
+    }
+}
+
+impl<'a, T: Render + Clone> Render for &'a mut T {
+    fn render(self, r: &mut Renderer) -> io::Result<()> {
+        self.clone().render(r)?;
         Ok(())
     }
 }
@@ -305,7 +336,7 @@ pub fn handle_dynamic() -> HandleDynamic {
 ///
 /// This code is non-zero to make it different from typical
 /// success exit code of an unsuspecting binary
-pub const EXIT_CODE_SUCCESS : i32 = 66;
+pub const EXIT_CODE_SUCCESS: i32 = 66;
 
 /// Exit code used by the dynamic template binary on failure
 ///
@@ -315,7 +346,7 @@ pub const EXIT_CODE_FAILED: i32 = 67;
 /// Exit code used by the deyamic template binary when template key was not found
 pub const EXIT_CODE_NOT_FOUND: i32 = 68;
 
-const ENV_NAME : &'static str = "RUST_STPL_DYNAMIC_TEMPLATE_NAME";
+const ENV_NAME: &'static str = "RUST_STPL_DYNAMIC_TEMPLATE_NAME";
 
 impl HandleDynamic {
     pub fn html<F, A, R>(&self, name: &str, f: F)
@@ -353,8 +384,7 @@ impl std::ops::Drop for HandleDynamic {
 #[derive(Fail, Debug)]
 pub enum DynamicError {
     #[fail(display = "IO error")] Io(#[cause] io::Error),
-    #[fail(display = "Template not found: {}", name)]
-    NotFound {
+    #[fail(display = "Template not found: {}", name)] NotFound {
         name: String,
     },
     #[fail(display = "Template failed")]
@@ -362,7 +392,7 @@ pub enum DynamicError {
         exit_code: Option<i32>,
         stdout: Vec<u8>,
         stderr: Vec<u8>,
-    }
+    },
 }
 
 impl From<io::Error> for DynamicError {
@@ -431,7 +461,7 @@ where
             exit_code: code,
             stdout: out.stdout,
             stderr: out.stderr,
-        })
+        }),
     }
 }
 

@@ -227,6 +227,21 @@ pub fn doctype(t: &'static str) -> impl Render {
     })
 }
 
+pub struct Nbsp;
+
+#[allow(non_upper_case_globals)]
+pub const nbsp: Nbsp = Nbsp;
+
+impl Render for Nbsp {
+    fn render(self, r: &mut super::Renderer) -> io::Result<()> {
+        r.write_raw(b"&nbsp;")
+    }
+}
+
+pub fn raw<'a, T: 'a + super::Renderer>(r: &'a mut T) -> super::RawRenderer<'a, T> {
+    super::RawRenderer(r)
+}
+
 impl_tag!(html);
 impl_tag!(head);
 impl_tag!(meta);
@@ -257,3 +272,4 @@ impl_tag!(a);
 impl_tag!(form);
 impl_tag!(button);
 impl_tag!(input);
+impl_tag!(img);
