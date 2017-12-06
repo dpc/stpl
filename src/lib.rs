@@ -9,7 +9,6 @@
 //! text-files with weird syntax. Everything is just normal, easy
 //! to understand Rust code.
 //!
-//!
 //! Let's take a look at a real-life example from the pilot project: an HTML
 //! base-skeleton template for a Bootstrap-based UI.
 //!
@@ -70,7 +69,7 @@
 //! can be implemented for new types or can be generated using functions/closures.
 //!
 //! Users are free to use any Rust language primitives to generate their
-//! templates and structure relationship between them in any way that does
+//! templates and structure relationship between them in any way that
 //! suits them.
 //!
 //! ### Dynamic rendering
@@ -121,13 +120,29 @@
 //!
 //! ```
 //! $ cargo build --bin template
-//! Compiling communityaudit v0.1.0 (file:///home/dpc/lab/rust/hackeraudit/web)
+//! Compiling webapp v0.1.0 (file:///home/dpc/lab/rust/webapp/web)
 //! Finished dev [unoptimized + debuginfo] target(s) in 1.04 secs
 //! ```
 //!
-//! ## Drawbacks
+//! ## Pros
 //!
-//! This library relies on some `nightly`-only unstable features
+//! * robust: template generation can reuse any existing code and data
+//!   structures
+//! * convenient: Rust tooling can work with plain-Rust-templates just
+//!   like any other code; `rustfmt` takes care of formatting, typos result
+//!   in normal error messages etc.
+//! * fast: the compiler optimizes the template code to essential logic
+//!   necessary to write-out the rendered template data to the IO; there
+//!   is no parsing involved
+//! * fast iteration: with dynamic loading it's possible to reload templates
+//!   without waiting for Rust compiler to build the whole app
+//!
+//! ## Cons
+//!
+//! * `nightly`-only: This library relies on some unstable features (mostly
+//!   `impl trait`)
+//! * immature and incomplete: This library is still work in progress, and will
+//!   mature with time.
 //!
 //! # Where to start
 //!
