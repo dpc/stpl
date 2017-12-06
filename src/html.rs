@@ -2,8 +2,77 @@ use std::io;
 use std::fmt;
 use std::borrow::Cow;
 
+use serde;
 use Render;
 use super::Fn;
+use std;
+
+/// A HTML Template
+///
+/// It consists of unique key used to identify the template
+/// across dynamic rendering calls, and a function accepting
+/// one (de-)serializable data, and returning a value of `Render` type.
+///
+/// Typically you will want a list of global functions
+/// for all templates (eg. all html pages of your web-app)
+/// defined. Eg.
+///
+/// ```
+/// pub fn home_tpl() -> impl Template {
+///    Template::new("home", tpl::home::page)
+/// }
+/// ```
+pub struct Template<F, A> {
+    key: &'static str,
+    f: F,
+    _a: std::marker::PhantomData<A>,
+}
+
+impl<F, A, R> Template<F, A>
+where
+    F: std::ops::Fn(&A) -> R,
+    R: Render,
+    A: serde::Serialize + for<'de> serde::Deserialize<'de>,
+{
+    pub fn new(key: &'static str, f: F) -> Self {
+        Template {
+            key: key,
+            f: f,
+            _a: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<F, A, R> ::Template for Template<F, A>
+where
+    F: std::ops::Fn(&A) -> R,
+    R: Render,
+    A: serde::Serialize + for<'de> serde::Deserialize<'de>,
+{
+    type Argument = A;
+    fn key(&self) -> &'static str {
+        self.key
+    }
+    fn render(&self, argument: &Self::Argument, io: &mut io::Write) -> io::Result<()> {
+        let render = self.f.call((argument,));
+        render.render(&mut Renderer::new(io))?;
+        Ok(())
+    }
+}
+
+pub trait RenderExt: Render {
+    fn render_to_vec(&self) -> Vec<u8> {
+        let mut v: Vec<u8> = vec![];
+        self.render(&mut Renderer::new(&mut v)).unwrap();
+        v
+    }
+
+    fn renderto_string(&self) -> String {
+        String::from_utf8_lossy(&self.render_to_vec()).into()
+    }
+}
+
+impl<T: Render + ?Sized> RenderExt for T {}
 
 pub struct Renderer<T> {
     io: T,
@@ -142,6 +211,7 @@ macro_rules! impl_attr_all {
         impl_attr!(placeholder);
         impl_attr!(value);
         impl_attr!(alt);
+        impl_attr!(style);
 
         pub fn type_<V : Into<CowStr>>(self, val: V) -> Tag {
             self.attr("type", val)
@@ -278,3 +348,6 @@ impl_tag!(form);
 impl_tag!(button);
 impl_tag!(input);
 impl_tag!(img);
+
+
+// vim: foldmethod=marker foldmarker={{{,}}}
