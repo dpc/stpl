@@ -17,7 +17,8 @@
 
 ### stpl - Super template library for Rust
 
-`stpl` is plain-Rust template library.
+`stpl` is a plain-Rust-only template library with some neat properties and
+features.
 
 ### Main idea
 
@@ -26,7 +27,8 @@ text-files with weird syntax. Everything is just normal, easy
 to understand Rust code.
 
 
-Let's take a look at a real-life example from the pilot project:
+Let's take a look at a real-life example from the pilot project: an HTML
+base-skeleton template for a Bootstrap-based UI.
 
 ```rust,no_run
 pub fn base<C: Render + 'static>(data: &Data, content: C) -> impl Render {
@@ -70,9 +72,6 @@ pub fn base<C: Render + 'static>(data: &Data, content: C) -> impl Render {
     )
 }
 ```rust
-
-The above is an HTML base-template. It contains base HTML skeleton of a
-Bootstrap-based UI.
 
 It is just a function. There is no magic, no macros, no textfiles involved.
 The whole template was formatted with `rustfmt` just like a normal Rust code.
