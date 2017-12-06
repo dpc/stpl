@@ -1,6 +1,6 @@
 [package]
 name = "stpl"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Dawid Ciężarkiewicz <dpc@dpc.pw>"]
 description = "Super templates (html, etc.) with Plain-Rust, no textfiles"
 keywords = ["template", "html", "markup", "dynamic"]
