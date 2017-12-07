@@ -70,7 +70,7 @@ pub fn base<C: Render + 'static>(data: &Data, content: C) -> impl Render {
         ))
     )
 }
-```rust
+```
 
 It is just a function. There is no magic, no macros, no textfiles involved.
 The whole template was formatted with `rustfmt` just like a normal Rust code.
