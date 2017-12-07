@@ -519,7 +519,7 @@ pub const EXIT_CODE_NOT_FOUND: i32 = 68;
 const ENV_NAME: &'static str = "RUST_STPL_DYNAMIC_TEMPLATE_KEY";
 
 impl HandleDynamic {
-    pub fn template<T: Template>(&self, template: &T) {
+    pub fn template<T: Template>(self, template: &T) -> HandleDynamic {
         // TODO: optimize, don't fetch every time?
         if let Ok(var_name) = std::env::var(ENV_NAME) {
             if var_name.as_str() == template.key() {
@@ -532,6 +532,8 @@ impl HandleDynamic {
                 }
             }
         }
+
+        self
     }
 }
 
