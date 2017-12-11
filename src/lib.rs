@@ -170,7 +170,6 @@ use std::path::Path;
 /// HTML rendering
 pub mod html;
 
-
 /// A whole template that knows how to render itself
 ///
 /// See `html::Template` for the actual type implementing it
@@ -279,6 +278,62 @@ impl<T: Render> Render for Vec<T> {
     }
 }
 
+impl<T: Render> Render for [T] {
+    fn render(&self, r: &mut Renderer) -> io::Result<()> {
+        for t in self.iter() {
+            t.render(r)?;
+        }
+        Ok(())
+    }
+}
+
+macro_rules! impl_narr {
+    ($n:expr) => {
+        impl<T: Render> Render for [T; $n] {
+            fn render(&self, r: &mut Renderer) -> io::Result<()> {
+                for t in self.iter() {
+                    t.render(r)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl_narr!(0);
+impl_narr!(1);
+impl_narr!(2);
+impl_narr!(3);
+impl_narr!(4);
+impl_narr!(5);
+impl_narr!(6);
+impl_narr!(7);
+impl_narr!(8);
+impl_narr!(9);
+impl_narr!(10);
+impl_narr!(11);
+impl_narr!(12);
+impl_narr!(13);
+impl_narr!(14);
+impl_narr!(15);
+impl_narr!(16);
+impl_narr!(17);
+impl_narr!(18);
+impl_narr!(19);
+impl_narr!(20);
+impl_narr!(21);
+impl_narr!(22);
+impl_narr!(23);
+impl_narr!(24);
+impl_narr!(25);
+impl_narr!(26);
+impl_narr!(27);
+impl_narr!(28);
+impl_narr!(29);
+impl_narr!(30);
+impl_narr!(31);
+impl_narr!(32);
+
 impl<'a, T: Render + ?Sized> Render for &'a mut T {
     fn render(&self, r: &mut Renderer) -> io::Result<()> {
         (**self).render(r)?;
@@ -292,8 +347,6 @@ impl<T: Render + ?Sized> Render for Box<T> {
         Ok(())
     }
 }
-
-
 
 impl Render for () {
     fn render(&self, _: &mut Renderer) -> io::Result<()> {
@@ -315,11 +368,23 @@ impl Render for String {
     }
 }
 
-impl Render for usize {
-    fn render(&self, r: &mut Renderer) -> io::Result<()> {
-        r.write_raw_fmt(&format_args!("{}", self))
+macro_rules! impl_render_raw {
+    ($t:ty) => {
+
+        impl Render for $t {
+            fn render(&self, r: &mut Renderer) -> io::Result<()> {
+                r.write_raw_fmt(&format_args!("{}", self))
+            }
+        }
     }
 }
+
+impl_render_raw!(i64);
+impl_render_raw!(u64);
+impl_render_raw!(i32);
+impl_render_raw!(u32);
+impl_render_raw!(usize);
+impl_render_raw!(isize);
 
 impl<'a> Render for &'a str {
     fn render(&self, r: &mut Renderer) -> io::Result<()> {
@@ -338,7 +403,6 @@ impl<'a> Render for &'a fmt::Arguments<'a> {
         r.write_fmt(self)
     }
 }
-
 
 impl<A> Render for (A,)
 where
@@ -569,8 +633,6 @@ impl From<io::Error> for DynamicError {
 }
 
 type DynamicResult<T> = std::result::Result<T, DynamicError>;
-
-
 
 /// Call a template dynamically (with ability to update at runtime)
 ///

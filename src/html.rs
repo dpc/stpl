@@ -184,7 +184,6 @@ impl<I: Render> Render for FinalTag<I> {
     }
 }
 
-
 macro_rules! impl_attr {
     ($t:ident) => {
         pub fn $t<V : Into<CowStr>>(self, val: V) -> Tag {
@@ -236,6 +235,9 @@ macro_rules! impl_attr_all {
         }
         pub fn aria_labelledby(self, val: &'static str) -> Tag {
             self.attr("aria-labelledby", val)
+        }
+        pub fn aria_current(self, val: &'static str) -> Tag {
+            self.attr("aria-current", val)
         }
     )
 }
@@ -348,6 +350,7 @@ impl_tag!(form);
 impl_tag!(button);
 impl_tag!(input);
 impl_tag!(img);
-
+impl_tag!(blockquote);
+impl_tag!(footer);
 
 // vim: foldmethod=marker foldmarker={{{,}}}
