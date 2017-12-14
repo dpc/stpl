@@ -302,18 +302,26 @@ pub fn doctype(t: &'static str) -> impl Render {
         r.write_raw(b">")
     })
 }
+macro_rules! impl_esc {
+    ($i:ident, $t:ident, $s:expr) => {
 
-#[derive(Copy, Clone)]
-pub struct Nbsp;
+        #[derive(Copy, Clone)]
+        pub struct $t;
 
-#[allow(non_upper_case_globals)]
-pub const nbsp: Nbsp = Nbsp;
+        #[allow(non_upper_case_globals)]
+        pub const $i: $t = $t;
 
-impl Render for Nbsp {
-    fn render(&self, r: &mut super::Renderer) -> io::Result<()> {
-        r.write_raw_str("&nbsp;")
+        impl Render for $t {
+            fn render(&self, r: &mut super::Renderer) -> io::Result<()> {
+                r.write_raw_str($s)
+            }
+        }
     }
 }
+
+impl_esc!(nbsp, Nbsp, "&nbsp;");
+impl_esc!(lt, Lt, "&lt;");
+impl_esc!(gt, Gt, "&gt;");
 
 pub fn raw<T: Render>(x: T) -> impl Render {
     Fn(move |r: &mut super::Renderer| x.render(&mut super::RawRenderer(r)))
