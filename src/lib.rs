@@ -379,6 +379,8 @@ macro_rules! impl_render_raw {
     }
 }
 
+impl_render_raw!(f64);
+impl_render_raw!(f32);
 impl_render_raw!(i64);
 impl_render_raw!(u64);
 impl_render_raw!(i32);
