@@ -211,6 +211,7 @@ macro_rules! impl_attr_all {
         impl_attr!(value);
         impl_attr!(alt);
         impl_attr!(style);
+        impl_attr!(onclick);
 
         pub fn type_<V : Into<CowStr>>(self, val: V) -> Tag {
             self.attr("type", val)
@@ -238,6 +239,9 @@ macro_rules! impl_attr_all {
         }
         pub fn aria_current(self, val: &'static str) -> Tag {
             self.attr("aria-current", val)
+        }
+        pub fn for_(self, val: &'static str) -> Tag {
+            self.attr("for", val)
         }
     )
 }
@@ -347,6 +351,7 @@ impl_tag!(span);
 impl_tag!(b);
 impl_tag!(i);
 impl_tag!(u);
+impl_tag!(tt);
 impl_tag!(string);
 impl_tag!(pre);
 impl_tag!(link);
@@ -360,5 +365,7 @@ impl_tag!(input);
 impl_tag!(img);
 impl_tag!(blockquote);
 impl_tag!(footer);
+impl_tag!(wrapper);
+impl_tag!(label);
 
 // vim: foldmethod=marker foldmarker={{{,}}}
