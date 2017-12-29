@@ -7,10 +7,11 @@ extern crate serde;
 extern crate serde_derive;
 
 use std::io::Write;
-use stpl::Render;
+use stpl::html;
 
 pub mod templates;
 use templates::*;
+
 
 pub fn print_template(tpl: impl stpl::Render) {
     let mut v = vec![];
@@ -20,9 +21,13 @@ pub fn print_template(tpl: impl stpl::Render) {
     std::io::stdout().write_all(&v).unwrap();
 }
 
+pub fn home_tpl() -> impl stpl::Template {
+    html::Template::new("home", ::templates::home::page)
+}
+
 fn main() {
-    stpl::handle_dynamic().
-        html("home", templates::home::page);
+    stpl::handle_dynamic()
+        .template(&home_tpl());
 
     let data = templates::home::Data {
         page: base::Data {
@@ -38,7 +43,7 @@ fn main() {
         print_template(templates::home::page(&data));
         println!("");
         println!("dynamic:");
-        std::io::stdout().write_all(&stpl::call_dynamic_self("home", &data).unwrap()).unwrap();
+        std::io::stdout().write_all(&stpl::render_dynamic_self(&home_tpl(), &data).unwrap()).unwrap();
         println!("");
         std::thread::sleep(std::time::Duration::from_secs(5));
     }

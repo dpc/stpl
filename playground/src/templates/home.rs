@@ -17,7 +17,7 @@ pub fn page(data: &Data) -> impl Render {
             format!("Hi, {}!", data.name)
         ),
         ul(
-            (0..5).map(|n| li(n)).collect::<Vec<_>>()
+            (0..2).map(|n| li(n)).collect::<Vec<_>>()
         )
     );
 

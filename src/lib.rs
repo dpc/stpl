@@ -185,20 +185,56 @@ pub trait Template {
 
 /// Convinience methods for `Template`
 pub trait TemplateExt: Template {
-    fn render_dynamic_self<A: 'static>(&self, data: &A) -> DynamicResult<Vec<u8>>
+    /// Call current binary file to handle the template
+    ///
+    /// Make sure to put `handle_dynamic` at the very beginning of your
+    /// binary if you want to use it.
+    ///
+    /// See `render_dynamic` for more info.
+    fn render_dynamic_self(&self, data: &<Self as Template>::Argument) -> DynamicResult<Vec<u8>>
     where
         Self: Sized,
-        A: serde::Serialize + for<'de> serde::Deserialize<'de>,
+        <Self as Template>::Argument: serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
     {
         render_dynamic_self(self, data)
     }
 
-    fn render_dynamic<A: 'static>(&self, path: &Path, data: &A) -> DynamicResult<Vec<u8>>
+    /// Call a template dynamically (with ability to update at runtime)
+    ///
+    /// Make sure to put `handle_dynamic` at the very beginning of the code
+    /// of program under `path`.
+    ///
+    /// `data` type must be the same as template expects.
+    ///
+    /// The template will evaluate in another process, so you can't rely
+    /// on value of globals, and such, but otherwise it's transparent.
+    ///
+    /// It works by serializing `data` and passing it to a child process.
+    /// The child process is the current binary, with environment variable
+    /// pointing to the right template. `handle_dynamic` will detect
+    /// being a dynamic-template-child, deserialize `data`, render
+    /// the template and write the output to `stdout`. This will
+    /// be used as a transparent Template.
+    fn render_dynamic(
+        &self,
+        path: &Path,
+        data: &<Self as Template>::Argument,
+    ) -> DynamicResult<Vec<u8>>
     where
         Self: Sized,
-        A: serde::Serialize + for<'de> serde::Deserialize<'de>,
+        <Self as Template>::Argument: serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
     {
         render_dynamic(path, self, data)
+    }
+
+    fn render_static(&self, data: &<Self as Template>::Argument) -> io::Result<Vec<u8>>
+    where
+        Self: Sized,
+        <Self as Template>::Argument: serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
+    {
+        let mut v = vec![];
+        self.render(data, &mut v)?;
+        Ok(v)
     }
 }
 
@@ -636,23 +672,7 @@ impl From<io::Error> for DynamicError {
 
 type DynamicResult<T> = std::result::Result<T, DynamicError>;
 
-/// Call a template dynamically (with ability to update at runtime)
-///
-/// Make sure to put `handle_dynamic` at the very beginning of the code
-/// of program under `path`.
-///
-/// `data` type must be the same as template expects.
-///
-/// The template will evaluate in another process, so you can't rely
-/// on value of globals, and such, but otherwise it's transparent.
-///
-/// It works by serializing `data` and passing it to a child process.
-/// The child process is the current binary, with environment variable
-/// pointing to the right template. `handle_dynamic` will detect
-/// being a dynamic-template-child, deserialize `data`, render
-/// the template and write the output to `stdout`. This will
-/// be used as a transparent Template.
-pub fn render_dynamic<'a, 'path, A: 'static, T: Template>(
+fn render_dynamic<'a, 'path, A: 'static, T: Template>(
     path: &'path Path,
     template: &'a T,
     data: &'a A,
@@ -696,18 +716,12 @@ where
     }
 }
 
-/// Call current binary file to handle the template
-///
-/// Make sure to put `handle_dynamic` at the very beginning of your
-/// binary if you want to use it.
-///
-/// See `render_dynamic` for more info.
-pub fn render_dynamic_self<A: 'static, T: Template>(
+fn render_dynamic_self<T: Template>(
     template: &T,
-    data: &A,
+    data: &<T as Template>::Argument,
 ) -> DynamicResult<Vec<u8>>
 where
-    A: serde::Serialize,
+    <T as Template>::Argument: serde::Serialize + 'static,
 {
     let path = std::env::args_os().next().unwrap();
     let path = path.as_ref();
