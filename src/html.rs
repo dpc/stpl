@@ -126,12 +126,12 @@ pub struct BareTag {
 
 pub struct Tag {
     tag: CowStr,
-    attrs: Vec<(CowStr, CowStr)>,
+    attrs: Vec<(CowStr, Option<CowStr>)>,
 }
 
 pub struct FinalTag<I> {
     tag: CowStr,
-    attrs: Vec<(CowStr, CowStr)>,
+    attrs: Vec<(CowStr, Option<CowStr>)>,
     inn: I,
 }
 
@@ -142,10 +142,13 @@ impl Render for Tag {
         for &(ref k, ref v) in self.attrs.iter() {
             r.write_raw_str(" ")?;
             r.write_raw_str(&*k)?;
-            r.write_raw_str("=\"")?;
-            r.write_raw_str(&*v)?;
-            r.write_raw_str("\"")?;
+            if let Some(ref v) = *v {
+                r.write_raw_str("=\"")?;
+                r.write_raw_str(&*v)?;
+                r.write_raw_str("\"")?;
+            }
         }
+
         r.write_raw_str(">")?;
         r.write_raw_str("</")?;
         r.write_raw_str(&*self.tag)?;
@@ -171,9 +174,11 @@ impl<I: Render> Render for FinalTag<I> {
         for &(ref k, ref v) in self.attrs.iter() {
             r.write_raw_str(" ")?;
             r.write_raw_str(&*k)?;
-            r.write_raw_str("=\"")?;
-            r.write_raw_str(&*v)?;
-            r.write_raw_str("\"")?;
+            if let Some(ref v) = *v {
+                r.write_raw_str("=\"")?;
+                r.write_raw_str(&*v)?;
+                r.write_raw_str("\"")?;
+            }
         }
 
         r.write_raw_str(">")?;
@@ -192,6 +197,21 @@ macro_rules! impl_attr {
     }
 }
 
+macro_rules! impl_attr1 {
+    ($t:ident) => {
+        pub fn $t(self) -> Tag {
+            self.attr1(stringify!($t))
+        }
+    }
+}
+
+macro_rules! impl_attr2 {
+    ($t1:ident, $t2:expr) => {
+        pub fn $t1<V : Into<CowStr>>(self, val: V) -> Tag {
+            self.attr($t2, val)
+        }
+    }
+}
 macro_rules! impl_attr_all {
     () => (
         impl_attr!(class);
@@ -209,53 +229,48 @@ macro_rules! impl_attr_all {
         impl_attr!(action);
         impl_attr!(placeholder);
         impl_attr!(value);
+        impl_attr!(rows);
         impl_attr!(alt);
         impl_attr!(style);
         impl_attr!(onclick);
-
-        pub fn type_<V : Into<CowStr>>(self, val: V) -> Tag {
-            self.attr("type", val)
-        }
-        pub fn data_toggle<V : Into<CowStr>>(self, val: V) -> Tag {
-            self.attr("data-toggle", val)
-        }
-        pub fn data_target(self, val: &'static str) -> Tag {
-            self.attr("data-target", val)
-        }
-        pub fn aria_controls(self, val: &'static str) -> Tag {
-            self.attr("aria-controls", val)
-        }
-        pub fn aria_expanded(self, val: &'static str) -> Tag {
-            self.attr("aria-expanded", val)
-        }
-        pub fn aria_label(self, val: &'static str) -> Tag {
-            self.attr("aria-label", val)
-        }
-        pub fn aria_haspopup(self, val: &'static str) -> Tag {
-            self.attr("aria-haspopup", val)
-        }
-        pub fn aria_labelledby(self, val: &'static str) -> Tag {
-            self.attr("aria-labelledby", val)
-        }
-        pub fn aria_current(self, val: &'static str) -> Tag {
-            self.attr("aria-current", val)
-        }
-        pub fn for_(self, val: &'static str) -> Tag {
-            self.attr("for", val)
-        }
+        impl_attr!(placement);
+        impl_attr!(toggle);
+        impl_attr!(scope);
+        impl_attr!(title);
+        impl_attr1!(checked);
+        impl_attr1!(enabled);
+        impl_attr1!(disabled);
+        impl_attr2!(type_, "type");
+        impl_attr2!(data_toggle, "data-toggle");
+        impl_attr2!(data_target, "data-target");
+        impl_attr2!(data_placement, "data-placement");
+        impl_attr2!(aria_controls, "aria-controls");
+        impl_attr2!(aria_expanded, "aria-expanded");
+        impl_attr2!(aria_label, "aria-label");
+        impl_attr2!(aria_haspopup, "aria-haspopup");
+        impl_attr2!(aria_labelledby, "aria-labelledby");
+        impl_attr2!(aria_current, "aria-current");
+        impl_attr2!(for_, "for");
     )
 }
 
 impl Tag {
     pub fn attr<K: Into<CowStr>, V: Into<CowStr>>(self, key: K, val: V) -> Tag {
         let Tag { tag, mut attrs } = self;
-        attrs.push((key.into(), val.into()));
+        attrs.push((key.into(), Some(val.into())));
         Tag {
             tag: tag,
             attrs: attrs,
         }
     }
-
+    pub fn attr1<K: Into<CowStr>>(self, key: K) -> Tag {
+        let Tag { tag, mut attrs } = self;
+        attrs.push((key.into(), None));
+        Tag {
+            tag: tag,
+            attrs: attrs,
+        }
+    }
     impl_attr_all!();
 }
 
@@ -263,7 +278,13 @@ impl BareTag {
     pub fn attr<K: Into<CowStr>, V: Into<CowStr>>(self, key: K, val: V) -> Tag {
         Tag {
             tag: self.tag.into(),
-            attrs: vec![(key.into(), val.into())],
+            attrs: vec![(key.into(), Some(val.into()))],
+        }
+    }
+    pub fn attr1<K: Into<CowStr>>(self, key: K) -> Tag {
+        Tag {
+            tag: self.tag.into(),
+            attrs: vec![(key.into(), None)],
         }
     }
     impl_attr_all!();
@@ -367,5 +388,12 @@ impl_tag!(blockquote);
 impl_tag!(footer);
 impl_tag!(wrapper);
 impl_tag!(label);
+impl_tag!(table);
+impl_tag!(thead);
+impl_tag!(th);
+impl_tag!(tr);
+impl_tag!(td);
+impl_tag!(tbody);
+impl_tag!(textarea);
 
 // vim: foldmethod=marker foldmarker={{{,}}}
