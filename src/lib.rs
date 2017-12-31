@@ -12,7 +12,7 @@
 //! Let's take a look at a real-life example from the pilot project: an HTML
 //! base-skeleton template for a Bootstrap-based UI.
 //!
-//! ```rust,no_run
+//! ```ignore
 //! pub fn base<C: Render + 'static>(data: &Data, content: C) -> impl Render {
 //!     (
 //!         doctype("html"),
@@ -118,7 +118,7 @@
 //! In our tests it takes 11.4 secs to build the main webapp in debug mode,
 //! while recompiling all templates is much faster:
 //!
-//! ```
+//! ```norust
 //! $ cargo build --bin template
 //! Compiling webapp v0.1.0 (file:///home/dpc/lab/rust/webapp/web)
 //! Finished dev [unoptimized + debuginfo] target(s) in 1.04 secs

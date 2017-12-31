@@ -17,11 +17,20 @@ use std;
 /// for all templates (eg. all html pages of your web-app)
 /// defined. Eg.
 ///
-/// ```
+/// ```ignore
 /// pub fn home_tpl() -> impl Template {
 ///    Template::new("home", tpl::home::page)
 /// }
 /// ```
+///
+/// or
+///
+/// ```ignore
+/// pub fn home_tpl() -> impl Template<Attribute = tpl::home::Data> {
+///    Template::new("home", tpl::home::page)
+/// }
+/// ```
+///
 pub struct Template<F, A> {
     key: &'static str,
     f: F,
