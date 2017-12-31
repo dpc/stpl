@@ -160,6 +160,8 @@
 extern crate bincode;
 #[macro_use]
 extern crate failure;
+#[macro_use]
+extern crate lazy_static;
 extern crate serde;
 
 use std::{fmt, io};
@@ -169,6 +171,16 @@ use std::path::Path;
 
 /// HTML rendering
 pub mod html;
+
+lazy_static! {
+    static ref IS_ENV_STPL_PROD: bool = {
+        if let Ok(_val) = std::env::var("STPL_PROD") {
+            true
+        } else {
+            false
+        }
+    };
+}
 
 /// A whole template that knows how to render itself
 ///
@@ -191,12 +203,19 @@ pub trait TemplateExt: Template {
     /// binary if you want to use it.
     ///
     /// See `render_dynamic` for more info.
+    ///
+    /// This function will behave like `render_static` if
+    /// `STPL_PROD` environment variable is enabled.
     fn render_dynamic_self(&self, data: &<Self as Template>::Argument) -> DynamicResult<Vec<u8>>
     where
         Self: Sized,
         <Self as Template>::Argument: serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
     {
-        render_dynamic_self(self, data)
+        if *IS_ENV_STPL_PROD {
+            self.render_static(data).map_err(|e| e.into())
+        } else {
+            render_dynamic_self(self, data)
+        }
     }
 
     /// Call a template dynamically (with ability to update at runtime)
@@ -215,6 +234,9 @@ pub trait TemplateExt: Template {
     /// being a dynamic-template-child, deserialize `data`, render
     /// the template and write the output to `stdout`. This will
     /// be used as a transparent Template.
+    ///
+    /// This function will behave like `render_static` if
+    /// `STPL_PROD` environment variable is enabled.
     fn render_dynamic(
         &self,
         path: &Path,
@@ -224,7 +246,11 @@ pub trait TemplateExt: Template {
         Self: Sized,
         <Self as Template>::Argument: serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
     {
-        render_dynamic(path, self, data)
+        if *IS_ENV_STPL_PROD {
+            self.render_static(data).map_err(|e| e.into())
+        } else {
+            render_dynamic(path, self, data)
+        }
     }
 
     fn render_static(&self, data: &<Self as Template>::Argument) -> io::Result<Vec<u8>>
