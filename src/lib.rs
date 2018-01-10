@@ -609,7 +609,7 @@ where
 }
 // }}}
 
-fn handle_dynamic_impl<T: Template>(template: &T) -> io::Result<()> {
+fn handle_dynamic_impl<T: Template + ?Sized>(template: &T) -> io::Result<()> {
     let mut v = vec![];
     std::io::stdin().read_to_end(&mut v)?;
     let arg: T::Argument = bincode::deserialize(&v[..])
@@ -647,7 +647,10 @@ pub const EXIT_CODE_NOT_FOUND: i32 = 68;
 const ENV_NAME: &'static str = "RUST_STPL_DYNAMIC_TEMPLATE_KEY";
 
 impl HandleDynamic {
-    pub fn template<T: Template>(self, template: &T) -> HandleDynamic {
+    pub fn template<A: serde::Serialize + for<'de> serde::Deserialize<'de>>(
+        self,
+        template: &Template<Argument = A>,
+    ) -> HandleDynamic {
         // TODO: optimize, don't fetch every time?
         if let Ok(var_name) = std::env::var(ENV_NAME) {
             if var_name.as_str() == template.key() {
