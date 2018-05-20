@@ -151,12 +151,8 @@
 //! # Help
 //!
 //! Please see `./playground` subdirectory for example usage.
-
-#![feature(universal_impl_trait)]
-#![feature(conservative_impl_trait)]
 #![feature(unboxed_closures)]
 #![feature(fn_traits)]
-
 extern crate bincode;
 #[macro_use]
 extern crate failure;
