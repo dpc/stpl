@@ -680,6 +680,8 @@ pub enum DynamicError {
     #[fail(display = "IO error")] Io(#[cause] io::Error),
     #[fail(display = "Template not found: {}", key)] NotFound {
         key: String,
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
     },
     #[fail(display = "Template failed")]
     Failed {
@@ -687,6 +689,36 @@ pub enum DynamicError {
         stdout: Vec<u8>,
         stderr: Vec<u8>,
     },
+}
+
+impl DynamicError {
+    pub fn stdout(&self) -> Option<&[u8]> {
+        match self {
+            DynamicError::Io(_) => None,
+            DynamicError::NotFound {
+                stdout,
+                ..
+            } => Some(stdout.as_slice()),
+            DynamicError::Failed {
+                stdout,
+                ..
+            } => Some(stdout.as_slice()),
+        }
+    }
+
+    pub fn stderr(&self) -> Option<&[u8]> {
+        match self {
+            DynamicError::Io(_) => None,
+            DynamicError::NotFound {
+                stderr,
+                ..
+            } => Some(stderr.as_slice()),
+            DynamicError::Failed {
+                stderr,
+                ..
+            } => Some(stderr.as_slice()),
+        }
+    }
 }
 
 impl From<io::Error> for DynamicError {
@@ -732,6 +764,8 @@ where
         Some(EXIT_CODE_SUCCESS) => Ok(out.stdout),
         Some(EXIT_CODE_NOT_FOUND) => Err(DynamicError::NotFound {
             key: template.key().to_owned(),
+            stdout: out.stdout,
+            stderr: out.stderr,
         }),
         code => Err(DynamicError::Failed {
             exit_code: code,
