@@ -1,127 +1,48 @@
-use std::io;
-use std::fmt;
 use std::borrow::Cow;
+use std::fmt;
+use std::io;
 
-use serde;
-use Render;
 use super::Fn;
-use std;
-
-/// A HTML Template
-///
-/// It consists of unique key used to identify the template
-/// across dynamic rendering calls, and a function accepting
-/// one (de-)serializable data, and returning a value of `Render` type.
-///
-/// Typically you will want a list of global functions
-/// for all templates (eg. all html pages of your web-app)
-/// defined. Eg.
-///
-/// ```ignore
-/// pub fn home_tpl() -> impl Template {
-///    Template::new("home", tpl::home::page)
-/// }
-/// ```
-///
-/// or
-///
-/// ```ignore
-/// pub fn home_tpl() -> impl Template<Attribute = tpl::home::Data> {
-///    Template::new("home", tpl::home::page)
-/// }
-/// ```
-///
-pub struct Template<F, A> {
-    key: &'static str,
-    f: F,
-    _a: std::marker::PhantomData<A>,
-}
-
-impl<F, A, R> Template<F, A>
-where
-    F: std::ops::Fn(&A) -> R,
-    R: Render,
-    A: serde::Serialize + for<'de> serde::Deserialize<'de>,
-{
-    pub fn new(key: &'static str, f: F) -> Self {
-        Template {
-            key: key,
-            f: f,
-            _a: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<F, A, R> ::Template for Template<F, A>
-where
-    F: std::ops::Fn(&A) -> R,
-    R: Render,
-    A: serde::Serialize + for<'de> serde::Deserialize<'de>,
-{
-    type Argument = A;
-    fn key(&self) -> &'static str {
-        self.key
-    }
-    fn render(&self, argument: &Self::Argument, io: &mut io::Write) -> io::Result<()> {
-        let render = self.f.call((argument,));
-        render.render(&mut Renderer::new(io))?;
-        Ok(())
-    }
-}
+use Render;
 
 pub trait RenderExt: Render {
     fn render_to_vec(&self) -> Vec<u8> {
         let mut v: Vec<u8> = vec![];
-        self.render(&mut Renderer::new(&mut v)).unwrap();
+        self.render(&mut v).unwrap();
         v
     }
 
-    fn renderto_string(&self) -> String {
+    fn render_to_string(&self) -> String {
         String::from_utf8_lossy(&self.render_to_vec()).into()
     }
 }
 
 impl<T: Render + ?Sized> RenderExt for T {}
 
-pub struct Renderer<T> {
-    io: T,
-    tmp: Vec<u8>,
-}
-
-impl<T: io::Write> Renderer<T> {
-    pub fn new(t: T) -> Self {
-        Renderer { io: t, tmp: vec![] }
-    }
-}
-
-impl<T: io::Write> super::Renderer for Renderer<T> {
+impl<T: io::Write> super::Renderer for T {
     fn write_raw(&mut self, data: &[u8]) -> io::Result<()> {
-        self.io.write_all(data)
+        self.write_all(data)
     }
 
     fn write_raw_fmt(&mut self, fmt: &fmt::Arguments) -> io::Result<()> {
-        self.io.write_fmt(*fmt)
+        self.write_fmt(*fmt)
     }
 
     fn write(&mut self, data: &[u8]) -> io::Result<()> {
-        self.tmp.clear();
-
         for c in data {
             match *c as char {
-                '&' => self.tmp.extend_from_slice("&amp;".as_bytes()),
-                '<' => self.tmp.extend_from_slice("&lt;".as_bytes()),
-                '>' => self.tmp.extend_from_slice("&gt;".as_bytes()),
-                '"' => self.tmp.extend_from_slice("&quot;".as_bytes()),
-                '\'' => self.tmp.extend_from_slice("&#x27;".as_bytes()),
-                '/' => self.tmp.extend_from_slice("&#x2F;".as_bytes()),
+                '&' => self.write_all(b"&amp;")?,
+                '<' => self.write_all(b"&lt;")?,
+                '>' => self.write_all(b"&gt;")?,
+                '"' => self.write_all(b"&quot;")?,
+                '\'' => self.write_all(b"&#x27;")?,
+                '/' => self.write_all(b"&#x2F;")?,
                 // Additional one for old IE (unpatched IE8 and below)
                 // See https://github.com/OWASP/owasp-java-encoder/wiki/Grave-Accent-Issue
-                '`' => self.tmp.extend_from_slice("&#96;".as_bytes()),
-                _ => self.tmp.push(*c),
+                '`' => self.write_all(b"&#96;")?,
+                _ => self.write_all(&[*c])?,
             }
         }
-
-        self.io.write_all(&self.tmp)?;
 
         Ok(())
     }
@@ -222,7 +143,7 @@ macro_rules! impl_attr2 {
     }
 }
 macro_rules! impl_attr_all {
-    () => (
+    () => {
         impl_attr!(class);
         impl_attr!(id);
         impl_attr!(charset);
@@ -260,7 +181,7 @@ macro_rules! impl_attr_all {
         impl_attr2!(aria_labelledby, "aria-labelledby");
         impl_attr2!(aria_current, "aria-current");
         impl_attr2!(for_, "for");
-    )
+    };
 }
 
 impl Tag {
@@ -325,8 +246,10 @@ impl<A: Render + 'static> FnOnce<(A,)> for BareTag {
 macro_rules! impl_tag {
     ($t:ident) => {
         #[allow(non_upper_case_globals)]
-        pub const $t: BareTag = BareTag { tag: stringify!($t) };
-    }
+        pub const $t: BareTag = BareTag {
+            tag: stringify!($t),
+        };
+    };
 }
 
 pub fn doctype(t: &'static str) -> impl Render {
@@ -338,8 +261,8 @@ pub fn doctype(t: &'static str) -> impl Render {
 }
 macro_rules! impl_esc {
     ($i:ident, $t:ident, $s:expr) => {
-
         #[derive(Copy, Clone)]
+        /// Implement `$i`
         pub struct $t;
 
         #[allow(non_upper_case_globals)]
@@ -350,7 +273,7 @@ macro_rules! impl_esc {
                 r.write_raw_str($s)
             }
         }
-    }
+    };
 }
 
 impl_esc!(nbsp, Nbsp, "&nbsp;");

@@ -15,7 +15,3 @@ readme = "README.md"
 members = [ "playground" ]
 
 [dependencies]
-serde = "1"
-bincode = "0.9"
-failure = "0.1"
-lazy_static = "1"

@@ -10,7 +10,7 @@
 //! to understand Rust code.
 //!
 //! Let's take a look at a real-life example from the pilot project: an HTML
-//! base-skeleton template for a Bootstrap-based UI.
+//! based-skeleton template for a Bootstrap-based UI.
 //!
 //! ```ignore
 //! pub fn base<C: Render + 'static>(data: &Data, content: C) -> impl Render {
@@ -55,7 +55,7 @@
 //! }
 //! ```
 //!
-//! It is just a function. There is no magic, no macros, no textfiles involved.
+//! It is just a function. There is no magic, no macros, no text files involved.
 //! The whole template was formatted with `rustfmt` just like a normal Rust code.
 //!
 //! The function accepts arguments:
@@ -72,58 +72,6 @@
 //! templates and structure relationship between them in any way that
 //! suits them.
 //!
-//! ### Dynamic rendering
-//!
-//! While `stpl` generates Rust code and does not invole "runtime parsing",
-//! it supports doing the actual rendering in a
-//! separate process, thus hot-swapping the templates at runtime. This is very
-//! useful for speeding up development.
-//!
-//! The basic mechanism is:
-//!
-//! * serialize the template data, and send it to a child process
-//! * read the rendered template back from the child
-//!
-//! In the child process:
-//!
-//! * identify the template to use,
-//! * read the serialized data from the stdio and deserialize it
-//! * render the template and output it to stdout
-//!
-//! In this scheme the binary for parent and child processes can be the same
-//! (see `render_dynamic_self`) or different (see `render_dynamic).
-//!
-//! Using the same binary is more convenient. Using separate binaries
-//! requires structuring the project in a certain way, but can greatly
-//! improve iteration time.
-//!
-//! The following is an exerpt from `Cargo.toml` to support dynamic
-//! rendering in a separate binary:
-//!
-//! ```norust
-//!
-//! [[bin]]
-//! name = "template"
-//! path = "src/main_template.rs"
-//!
-//! [[bin]]
-//! name = "webapp"
-//! path = "src/main.rs"
-//! ```
-//!
-//! These two programs share many modules (eg. templates and data structures),
-//! but `main_template` does not have to include any heavy-duty libraries like
-//! `rocket`, `diesel` and similar, thus compiles much faster.
-//!
-//! In our tests it takes 11.4 secs to build the main webapp in debug mode,
-//! while recompiling all templates is much faster:
-//!
-//! ```norust
-//! $ cargo build --bin template
-//! Compiling webapp v0.1.0 (file:///home/dpc/lab/rust/webapp/web)
-//! Finished dev [unoptimized + debuginfo] target(s) in 1.04 secs
-//! ```
-//!
 //! ## Pros
 //!
 //! * robust: template generation can reuse any existing code and data
@@ -134,151 +82,52 @@
 //! * fast: the compiler optimizes the template code to essential logic
 //!   necessary to write-out the rendered template data to the IO; there
 //!   is no parsing involved
-//! * fast iteration: with dynamic loading it's possible to reload templates
-//!   without waiting for Rust compiler to build the whole app
 //!
 //! ## Cons
 //!
-//! * `nightly`-only: This library relies on some unstable features (mostly
-//!   `impl trait`)
+//! * `nightly`-only: This library relies on some unstable features:
+//!    * `#![feature(unboxed_closures)]`
+//!    # `![feature(fn_traits)]`
 //! * immature and incomplete: This library is still work in progress, and will
 //!   mature with time.
 //!
 //! # Where to start
 //!
 //! You are most probably interested in reading `html` module documentation
-//!
-//! # Help
-//!
-//! Please see `./playground` subdirectory for example usage.
 #![feature(unboxed_closures)]
 #![feature(fn_traits)]
-extern crate bincode;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate lazy_static;
-extern crate serde;
-
-use std::{fmt, io};
 use std::fmt::Arguments;
-use std::io::Read;
-use std::path::Path;
+use std::{fmt, io};
 
 /// HTML rendering
 pub mod html;
 
-lazy_static! {
-    static ref IS_ENV_STPL_PROD: bool = {
-        if let Ok(_val) = std::env::var("STPL_PROD") {
-            true
-        } else {
-            false
-        }
-    };
-}
-
-/// A whole template that knows how to render itself
-///
-/// See `html::Template` for the actual type implementing it
-/// and more concrete information.
-pub trait Template {
-    type Argument: serde::Serialize + for<'de> serde::Deserialize<'de>;
-    /// A unique key used to identify the template
-    fn key(&self) -> &'static str;
-
-    /// Render itself into an `io`
-    fn render<'a>(&self, argument: &Self::Argument, io: &'a mut io::Write) -> io::Result<()>;
-}
-
-/// Convinience methods for `Template`
-pub trait TemplateExt: Template {
-    /// Call current binary file to handle the template
-    ///
-    /// Make sure to put `handle_dynamic` at the very beginning of your
-    /// binary if you want to use it.
-    ///
-    /// See `render_dynamic` for more info.
-    ///
-    /// This function will behave like `render_static` if
-    /// `STPL_PROD` environment variable is enabled.
-    fn render_dynamic_self(&self, data: &<Self as Template>::Argument) -> DynamicResult<Vec<u8>>
-    where
-        Self: Sized,
-        <Self as Template>::Argument: serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
-    {
-        if *IS_ENV_STPL_PROD {
-            self.render_static(data).map_err(|e| e.into())
-        } else {
-            render_dynamic_self(self, data)
-        }
-    }
-
-    /// Call a template dynamically (with ability to update at runtime)
-    ///
-    /// Make sure to put `handle_dynamic` at the very beginning of the code
-    /// of program under `path`.
-    ///
-    /// `data` type must be the same as template expects.
-    ///
-    /// The template will evaluate in another process, so you can't rely
-    /// on value of globals, and such, but otherwise it's transparent.
-    ///
-    /// It works by serializing `data` and passing it to a child process.
-    /// The child process is the current binary, with environment variable
-    /// pointing to the right template. `handle_dynamic` will detect
-    /// being a dynamic-template-child, deserialize `data`, render
-    /// the template and write the output to `stdout`. This will
-    /// be used as a transparent Template.
-    ///
-    /// This function will behave like `render_static` if
-    /// `STPL_PROD` environment variable is enabled.
-    fn render_dynamic(
-        &self,
-        path: &Path,
-        data: &<Self as Template>::Argument,
-    ) -> DynamicResult<Vec<u8>>
-    where
-        Self: Sized,
-        <Self as Template>::Argument: serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
-    {
-        if *IS_ENV_STPL_PROD {
-            self.render_static(data).map_err(|e| e.into())
-        } else {
-            render_dynamic(path, self, data)
-        }
-    }
-
-    fn render_static(&self, data: &<Self as Template>::Argument) -> io::Result<Vec<u8>>
-    where
-        Self: Sized,
-        <Self as Template>::Argument: serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
-    {
-        let mut v = vec![];
-        self.render(data, &mut v)?;
-        Ok(v)
-    }
-}
-
-impl<T: Template> TemplateExt for T {}
 /// Rendering logic responsible for string escaping and such.
 ///
 /// See `html::Renderer` for implementation.
 pub trait Renderer {
+    /// Normal write: perform escaping etc. if necessary
     fn write(&mut self, data: &[u8]) -> io::Result<()> {
         self.write_raw(data)
     }
+    /// Normal write but with `format_args!`
     fn write_fmt(&mut self, fmt: &Arguments) -> io::Result<()> {
         self.write(format!("{}", fmt).as_bytes())
     }
+    /// Normal write for `&str`
     fn write_str(&mut self, s: &str) -> io::Result<()> {
         self.write(s.as_bytes())
     }
+
+    /// Raw write: no escaping should be performed
     fn write_raw(&mut self, data: &[u8]) -> io::Result<()>;
 
+    /// Raw write but with `format_args!`
     fn write_raw_fmt(&mut self, fmt: &Arguments) -> io::Result<()> {
         self.write_raw(format!("{}", fmt).as_bytes())
     }
+
+    /// Raw write for `&str`
     fn write_raw_str(&mut self, s: &str) -> io::Result<()> {
         self.write_raw(s.as_bytes())
     }
@@ -355,7 +204,7 @@ macro_rules! impl_narr {
                 Ok(())
             }
         }
-    }
+    };
 }
 
 impl_narr!(0);
@@ -428,13 +277,12 @@ impl Render for String {
 
 macro_rules! impl_render_raw {
     ($t:ty) => {
-
         impl Render for $t {
             fn render(&self, r: &mut Renderer) -> io::Result<()> {
                 r.write_raw_fmt(&format_args!("{}", self))
             }
         }
-    }
+    };
 }
 
 impl_render_raw!(f64);
@@ -604,187 +452,5 @@ where
     }
 }
 // }}}
-
-fn handle_dynamic_impl<T: Template + ?Sized>(template: &T) -> io::Result<()> {
-    let mut v = vec![];
-    std::io::stdin().read_to_end(&mut v)?;
-    let arg: T::Argument = bincode::deserialize(&v[..])
-        .map_err(|_e| io::Error::new(io::ErrorKind::Other, "Deserialization error"))?;
-
-    let stdout = std::io::stdout();
-    let stdout = stdout.lock();
-    let mut out = std::io::BufWriter::new(stdout);
-    template.render(&arg, &mut out)?;
-
-    Ok(())
-}
-
-/// `handle_dynamic` handle
-pub struct HandleDynamic;
-
-pub fn handle_dynamic() -> HandleDynamic {
-    HandleDynamic
-}
-
-/// Exit code used by the dynamic template binary on success
-///
-/// This code is non-zero to make it different from typical
-/// success exit code of an unsuspecting binary
-pub const EXIT_CODE_SUCCESS: i32 = 66;
-
-/// Exit code used by the dynamic template binary on failure
-///
-/// The stderr of the process will contain more information.
-pub const EXIT_CODE_FAILED: i32 = 67;
-
-/// Exit code used by the deyamic template binary when template key was not found
-pub const EXIT_CODE_NOT_FOUND: i32 = 68;
-
-const ENV_NAME: &'static str = "RUST_STPL_DYNAMIC_TEMPLATE_KEY";
-
-impl HandleDynamic {
-    pub fn template<A: serde::Serialize + for<'de> serde::Deserialize<'de>>(
-        self,
-        template: &Template<Argument = A>,
-    ) -> HandleDynamic {
-        // TODO: optimize, don't fetch every time?
-        if let Ok(var_name) = std::env::var(ENV_NAME) {
-            if var_name.as_str() == template.key() {
-                match handle_dynamic_impl(template) {
-                    Ok(_) => std::process::exit(EXIT_CODE_SUCCESS),
-                    Err(e) => {
-                        eprintln!("Dynamic template process failed: {:?}", e);
-                        std::process::exit(EXIT_CODE_FAILED);
-                    }
-                }
-            }
-        }
-
-        self
-    }
-}
-
-impl std::ops::Drop for HandleDynamic {
-    fn drop(&mut self) {
-        if let Ok(var_key) = std::env::var(ENV_NAME) {
-            if !var_key.is_empty() {
-                eprintln!("Couldn't find dynamic template by key: {}", var_key);
-                std::process::exit(EXIT_CODE_NOT_FOUND);
-            }
-        }
-    }
-}
-
-#[derive(Fail, Debug)]
-pub enum DynamicError {
-    #[fail(display = "IO error")] Io(#[cause] io::Error),
-    #[fail(display = "Template not found: {}", key)] NotFound {
-        key: String,
-        stdout: Vec<u8>,
-        stderr: Vec<u8>,
-    },
-    #[fail(display = "Template failed")]
-    Failed {
-        exit_code: Option<i32>,
-        stdout: Vec<u8>,
-        stderr: Vec<u8>,
-    },
-}
-
-impl DynamicError {
-    pub fn stdout(&self) -> Option<&[u8]> {
-        match self {
-            DynamicError::Io(_) => None,
-            DynamicError::NotFound {
-                stdout,
-                ..
-            } => Some(stdout.as_slice()),
-            DynamicError::Failed {
-                stdout,
-                ..
-            } => Some(stdout.as_slice()),
-        }
-    }
-
-    pub fn stderr(&self) -> Option<&[u8]> {
-        match self {
-            DynamicError::Io(_) => None,
-            DynamicError::NotFound {
-                stderr,
-                ..
-            } => Some(stderr.as_slice()),
-            DynamicError::Failed {
-                stderr,
-                ..
-            } => Some(stderr.as_slice()),
-        }
-    }
-}
-
-impl From<io::Error> for DynamicError {
-    fn from(e: io::Error) -> Self {
-        DynamicError::Io(e)
-    }
-}
-
-type DynamicResult<T> = std::result::Result<T, DynamicError>;
-
-fn render_dynamic<'a, 'path, A: 'static, T: Template>(
-    path: &'path Path,
-    template: &'a T,
-    data: &'a A,
-) -> DynamicResult<Vec<u8>>
-where
-    A: serde::Serialize,
-{
-    let encoded: Vec<u8> = bincode::serialize(&data, bincode::Infinite).unwrap();
-
-    use std::process::{Command, Stdio};
-    use std::io::Write;
-
-    let mut child = Command::new(path)
-        .env(ENV_NAME, template.key())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("failed to execute child");
-
-    // TODO: Sending and receiving could be done in a separate thread too, and
-    // some form of a "future" could be used
-    {
-        let stdin = child.stdin.as_mut().expect("failed to get stdin");
-        stdin.write_all(&encoded).expect("failed to write to stdin");
-        stdin.flush().expect("failed to flush stdin");
-    }
-    child.stdin = None;
-
-    let out = child.wait_with_output()?;
-    match out.status.code() {
-        Some(EXIT_CODE_SUCCESS) => Ok(out.stdout),
-        Some(EXIT_CODE_NOT_FOUND) => Err(DynamicError::NotFound {
-            key: template.key().to_owned(),
-            stdout: out.stdout,
-            stderr: out.stderr,
-        }),
-        code => Err(DynamicError::Failed {
-            exit_code: code,
-            stdout: out.stdout,
-            stderr: out.stderr,
-        }),
-    }
-}
-
-fn render_dynamic_self<T: Template>(
-    template: &T,
-    data: &<T as Template>::Argument,
-) -> DynamicResult<Vec<u8>>
-where
-    <T as Template>::Argument: serde::Serialize + 'static,
-{
-    let path = std::env::args_os().next().unwrap();
-    let path = path.as_ref();
-    render_dynamic(path, template, data)
-}
-
+//
 // vim: foldmethod=marker foldmarker={{{,}}}

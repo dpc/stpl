@@ -27,9 +27,9 @@ text-files with weird syntax. Everything is just normal, easy
 to understand Rust code.
 
 Let's take a look at a real-life example from the pilot project: an HTML
-base-skeleton template for a Bootstrap-based UI.
+based-skeleton template for a Bootstrap-based UI.
 
-```rust,no_run
+```rust
 pub fn base<C: Render + 'static>(data: &Data, content: C) -> impl Render {
     (
         doctype("html"),
@@ -72,7 +72,7 @@ pub fn base<C: Render + 'static>(data: &Data, content: C) -> impl Render {
 }
 ```
 
-It is just a function. There is no magic, no macros, no textfiles involved.
+It is just a function. There is no magic, no macros, no text files involved.
 The whole template was formatted with `rustfmt` just like a normal Rust code.
 
 The function accepts arguments:
@@ -89,58 +89,6 @@ Users are free to use any Rust language primitives to generate their
 templates and structure relationship between them in any way that
 suits them.
 
-### Dynamic rendering
-
-While `stpl` generates Rust code and does not invole "runtime parsing",
-it supports doing the actual rendering in a
-separate process, thus hot-swapping the templates at runtime. This is very
-useful for speeding up development.
-
-The basic mechanism is:
-
-* serialize the template data, and send it to a child process
-* read the rendered template back from the child
-
-In the child process:
-
-* identify the template to use,
-* read the serialized data from the stdio and deserialize it
-* render the template and output it to stdout
-
-In this scheme the binary for parent and child processes can be the same
-(see `render_dynamic_self`) or different (see `render_dynamic).
-
-Using the same binary is more convenient. Using separate binaries
-requires structuring the project in a certain way, but can greatly
-improve iteration time.
-
-The following is an exerpt from `Cargo.toml` to support dynamic
-rendering in a separate binary:
-
-```norust
-
-[[bin]]
-name = "template"
-path = "src/main_template.rs"
-
-[[bin]]
-name = "webapp"
-path = "src/main.rs"
-```
-
-These two programs share many modules (eg. templates and data structures),
-but `main_template` does not have to include any heavy-duty libraries like
-`rocket`, `diesel` and similar, thus compiles much faster.
-
-In our tests it takes 11.4 secs to build the main webapp in debug mode,
-while recompiling all templates is much faster:
-
-```rust
-$ cargo build --bin template
-Compiling webapp v0.1.0 (file:///home/dpc/lab/rust/webapp/web)
-Finished dev [unoptimized + debuginfo] target(s) in 1.04 secs
-```
-
 ### Pros
 
 * robust: template generation can reuse any existing code and data
@@ -151,23 +99,18 @@ Finished dev [unoptimized + debuginfo] target(s) in 1.04 secs
 * fast: the compiler optimizes the template code to essential logic
   necessary to write-out the rendered template data to the IO; there
   is no parsing involved
-* fast iteration: with dynamic loading it's possible to reload templates
-  without waiting for Rust compiler to build the whole app
 
 ### Cons
 
-* `nightly`-only: This library relies on some unstable features (mostly
-  `impl trait`)
+* `nightly`-only: This library relies on some unstable features:
+   * `#![feature(unboxed_closures)]`
+   # `![feature(fn_traits)]`
 * immature and incomplete: This library is still work in progress, and will
   mature with time.
 
 ## Where to start
 
 You are most probably interested in reading `html` module documentation
-
-## Help
-
-Please see `./playground` subdirectory for example usage.
 
 # License
 
